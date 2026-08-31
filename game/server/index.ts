@@ -305,8 +305,11 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
   // Вебхук Telegram виключено: його частоту визначає Telegram, і різати
   // її означало б втрачати оплати.
   if (path !== '/api/telegram/webhook') {
+    // Ліміт за адресою навмисно грубий: за одним NAT можуть сидіти кілька
+    // гравців, і різати їх усіх через одного — гірше, ніж пропустити зайвий
+    // запит. Точний ліміт стоїть нижче, за користувачем, там де вже є сесія.
     const write = req.method === 'POST';
-    if (!allow(`${clientKey(req)}|${write ? 'w' : 'r'}`, write ? 120 : 240)) {
+    if (!allow(`${clientKey(req)}|${write ? 'w' : 'r'}`, write ? 600 : 900)) {
       json(res, 429, { ok: false, reason: 'забагато запитів' });
       return;
     }
@@ -380,6 +383,8 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       const b = await readBody(req);
       const s = auth(b.initData as string | undefined);
       if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
+
+      if (!allow(`run|${s.userId}`, 60)) { json(res, 429, { ok: false, reason: 'забагато ранів' }); return; }
 
       const run: SubmittedRun = {
         seed: Number(b.seed),
@@ -491,6 +496,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       // заради чесності якого писався весь тиждень 4.
       const s = auth(b.initData as string | undefined);
       if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
+      if (!allow(`ev|${s.userId}`, 180)) { json(res, 429, { ok: false, reason: 'забагато подій' }); return; }
       if (!isEventName(b.name)) {
         json(res, 400, { ok: false, reason: 'невідома подія' });
         return;
@@ -695,7 +701,12 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
 
     if (path === '/api/stats' && req.method === 'GET') {
       if (!adminOk(req, url)) { json(res, 403, { ok: false, reason: 'потрібен секрет' }); return; }
-      json(res, 200, { runs: store.size, events: analytics.all().length, wallet: wallet.totals() });
+      json(res, 200, {
+        runs: store.counters.runs,          // повний лічильник, не стеля сховища
+        stored: store.size,
+        events: analytics.all().length,
+        wallet: wallet.totals(),
+      });
       return;
     }
 

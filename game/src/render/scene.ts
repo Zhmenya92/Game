@@ -39,8 +39,18 @@ export type Live = { kind: string; x: number; y: number } | null;
 function parallax(p: Painter, view: View, frame: FrameName, factor: number,
                   worldY: number, tileW: number, tileH: number): void {
   const shift = view.camX * factor;
-  const base = Math.floor(shift / tileW) * tileW;
-  const n = Math.ceil(view.w / tileW) + 2;
+  // ДЕФЕКТ 59, знайдений тестом рендера в русі.
+  //
+  // Замощення починалося з `floor(shift / tileW) * tileW`, тобто перша
+  // плитка лягала на екранну координату з проміжку (−tileW, 0]. Але зум
+  // 0.78 показує ШИРШЕ за вікно, і видима смуга починається на ~460
+  // одиниць ЛІВІШЕ за камеру. Коли перша плитка випадала близько до нуля,
+  // ліворуч лишалася порожнеча — і саме тому її не було видно на знімку
+  // одного кадру: вона зʼявляється лише на певних значеннях прокрутки.
+  //
+  // Тому починаємо на плитку раніше й кладемо на дві більше.
+  const base = (Math.floor(shift / tileW) - 1) * tileW;
+  const n = Math.ceil(view.w / tileW) + 3;
   for (let i = 0; i < n; i++) {
     p.quad(frame, view.camX - shift + base + i * tileW, worldY, tileW, tileH, 0, 1);
   }

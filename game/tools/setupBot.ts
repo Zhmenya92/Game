@@ -26,13 +26,15 @@ const secret = process.env.TELEGRAM_WEBHOOK_SECRET ?? '';
 const gameUrl = process.env.GAME_URL ?? publicUrl;
 const checkOnly = process.argv.includes('--check');
 
-if (!token) {
+const hasToken = token.length > 0;
+if (!hasToken) {
   console.error('немає BOT_TOKEN. Візьміть його у @BotFather і передайте змінною оточення.');
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 async function call<T>(method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+  const api = process.env.TELEGRAM_API ?? 'https://api.telegram.org';
+  const res = await fetch(`${api}/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body ?? {}),
@@ -44,9 +46,17 @@ async function call<T>(method: string, body?: unknown): Promise<T> {
 
 const say = (s: string) => console.log(s);
 
-try {
+// Без токена далі йти нікуди: раніше тут стояв process.exit(), і після
+// переходу на exitCode скрипт продовжував працювати й друкував зайву
+// мережеву помилку поверх зрозумілої.
+if (hasToken) try {
   const me = await call<{ username: string; id: number; can_join_groups?: boolean }>('getMe');
   say(`бот: @${me.username} (id ${me.id})`);
+
+  // Далі — через прапорці, а не через process.exit(). Вихід посеред живого
+  // зʼєднання ронить Node з кодом 0xC0000409 на Windows: саме так упав
+  // режим --check, і саме цю помилку вже ловили раніше в цьому проєкті.
+  let done = false;
 
   if (checkOnly) {
     const info = await call<{
@@ -55,19 +65,22 @@ try {
     say(`вебхук: ${info.url || 'не встановлений'}`);
     say(`  черга оновлень: ${info.pending_update_count}`);
     if (info.last_error_message) say(`  ⚠️ остання помилка: ${info.last_error_message}`);
-    process.exit(0);
+    done = true;
   }
 
-  if (!publicUrl) {
+  if (!done && !publicUrl) {
     console.error('немає PUBLIC_URL — адреси, за якою Telegram дістане бекенд (https, не localhost).');
-    process.exit(1);
+    process.exitCode = 1;
+    done = true;
   }
-  if (secret.length < 16) {
+  if (!done && secret.length < 16) {
     console.error('TELEGRAM_WEBHOOK_SECRET має бути щонайменше 16 символів: ' +
       'без нього вебхук приймає що завгодно від кого завгодно.');
-    process.exit(1);
+    process.exitCode = 1;
+    done = true;
   }
 
+  if (!done) {
   // 1. Команди. /paysupport обовʼязковий за правилами Telegram для Stars.
   await call('setMyCommands', {
     commands: [
@@ -107,7 +120,8 @@ try {
   say('');
   say('І прибрати DEV_ALLOW_UNSIGNED: із живим токеном він більше не потрібен,');
   say('а лишившись, він дозволяє будь-кому вигадати собі initData.');
+  }
 } catch (e) {
   console.error('помилка:', (e as Error).message);
-  process.exit(1);
+  process.exitCode = 1;
 }

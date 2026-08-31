@@ -224,12 +224,15 @@ await (async () => {
   }
 
   // Обмеження частоти.
-  let limited = false;
-  for (let i = 0; i < 130 && !limited; i++) {
+  // Ліміт за адресою навмисно грубий (за одним NAT можуть сидіти кілька
+  // гравців), а точний стоїть за користувачем — саме в нього й упремось.
+  let limited = '';
+  for (let i = 0; i < 220 && !limited; i++) {
     const r = await post('/api/event', { initData: U, name: 'run_start' });
-    if (r.s === 429) limited = true;
+    if (r.s === 429) limited = String(r.j.reason ?? '429');
   }
-  ok('надто часті запити впираються в обмеження', limited);
+  ok('надто часті запити впираються в обмеження', limited !== '', limited);
+  ok('спрацьовує саме ліміт за користувачем', limited.includes('подій'), limited);
 
   const health = await fetch(`${B}/health`);
   ok('перевірка живості відповідає навіть під лімітом', health.status === 200);

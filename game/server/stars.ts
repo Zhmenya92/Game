@@ -53,7 +53,13 @@ export function productById(id: string): Product | null {
   return CATALOG.find(p => p.id === id) ?? null;
 }
 
-const API = 'https://api.telegram.org';
+/**
+ * Адресу можна підмінити — і це не бекдор, а єдиний спосіб перевірити
+ * НАШУ половину протоколу без токена: тест піднімає заглушку й дивиться,
+ * які саме методи й параметри ми надсилаємо. Проти живого Telegram це
+ * нічого не доводить, і так і написано в шапці файлу.
+ */
+const API = process.env.TELEGRAM_API ?? 'https://api.telegram.org';
 
 export class NoBotToken extends Error {
   constructor() { super('немає BOT_TOKEN — Stars недоступні'); }
