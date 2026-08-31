@@ -1,0 +1,24 @@
+{
+  "name": "pavutyna-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Прототип 1 «Павутина» — grey-box тижня 1",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 8788",
+    "test": "node test/determinism.ts && node test/fairness.ts",
+    "test:determinism": "node test/determinism.ts",
+    "test:fairness": "node test/fairness.ts",
+    "sweep": "node tools/sweep3.ts",
+    "trace": "node tools/trace.ts"
+  },
+  "dependencies": {
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vite": "^8.2.2"
+  }
+}

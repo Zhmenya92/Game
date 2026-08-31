@@ -422,14 +422,15 @@
         <li><a href="#concepts"><span class="n">09</span> Концепти</a></li>
         <li><a href="#proto1"><span class="n">10</span> Прототип 1</a></li>
         <li><a href="#brief"><span class="n">11</span> Бриф Т1</a></li>
-        <li><a href="#tech"><span class="n">12</span> Технології</a></li>
-        <li><a href="#plan"><span class="n">13</span> Реалізація</a></li>
-        <li><a href="#heity"><span class="n">14</span> Гейти</a></li>
-        <li><a href="#viral"><span class="n">15</span> Віральність</a></li>
-        <li><a href="#hroshi"><span class="n">16</span> Економіка</a></li>
-        <li><a href="#ryzyky"><span class="n">17</span> Ризики</a></li>
-        <li><a href="#rish"><span class="n">18</span> Рішення</a></li>
-        <li><a href="#dzherela"><span class="n">19</span> Файли</a></li>
+        <li><a href="#build"><span class="n">12</span> Збірка</a></li>
+        <li><a href="#tech"><span class="n">13</span> Технології</a></li>
+        <li><a href="#plan"><span class="n">14</span> Реалізація</a></li>
+        <li><a href="#heity"><span class="n">15</span> Гейти</a></li>
+        <li><a href="#viral"><span class="n">16</span> Віральність</a></li>
+        <li><a href="#hroshi"><span class="n">17</span> Економіка</a></li>
+        <li><a href="#ryzyky"><span class="n">18</span> Ризики</a></li>
+        <li><a href="#rish"><span class="n">19</span> Рішення</a></li>
+        <li><a href="#dzherela"><span class="n">20</span> Файли</a></li>
       </ol>
       <button class="themebtn" id="themebtn" type="button">Тема</button>
       <p class="rail-foot">Позначки достовірності наскрізні: якщо число не має «перевірено», воно не є підставою для рішення.</p>
@@ -2224,8 +2225,87 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
       </section>
 
       <!-- 12 -->
+      <section id="build">
+        <div class="sec-head"><span class="n">12</span><h2>Збірка</h2></div>
+        <p class="lede">Прототип написаний і запускається. Ядро симуляції — чистий TypeScript без залежності від рушія, тому тести ганяються прямо в Node. <b>Бриф пройшов ревізію на папері й дав 15 виправлень; реалізація дала ще десять</b> — і жодне з них не можна було знайти читанням.</p>
+
+        <div class="grid g3">
+          <div class="card hi">
+            <span class="kicker">Детермінізм</span>
+            <div class="stat"><span class="v">6 / 6</span><span class="k">перевірок зелені</span></div>
+            <p>Той самий сід і ввід дають той самий стан; реплей із треку відтворює живий ран; серіалізація не втрачає даних; <code>buildFromTraces</code> не залежить від порядку входу.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Правило чесності</span>
+            <div class="stat"><span class="v" style="color:var(--bad)">94.8 %</span><span class="k">проти порога 95 % — червоний</span></div>
+            <p>Поріг <strong>не зсовував</strong> під результат. Але й «непрохідні» 5.2 % не доведено непрохідними: доведено лише, що їх не беруть перевірені політики.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Вага рушія</span>
+            <div class="stat"><span class="v">361 КБ</span><span class="k">gzip, порожній прототип</span></div>
+            <p>Бюджет усього білда — ≤ 3 МБ. Phaser з'їдає <strong>12 %</strong> ще до першої картинки. Не блокер, але контролювати з першого дня.</p>
+          </div>
+        </div>
+
+        <h3>Десять дефектів, знайдених реалізацією</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:30px">#</th><th>Що впало</th><th>Як виявилось</th><th>Що стало</th></tr></thead>
+            <tbody>
+              <tr><td class="num">16</td><td>Конус навколо <b>вектора швидкості</b></td><td>Не працює за побудовою: при падінні вектор дивиться вниз, а анкери вгорі</td><td>Конус переїхав на вісь +X</td></tr>
+              <tr><td class="num"><b>17</b></td><td>Модель вводу «тап → буфер 80 мс → все»</td><td><b>1000 із 1000 сідів падали рівно за 1.05 с</b> — гравець не чіплявся жодного разу. Перша ціль валідна на кадрі ~12, буфер кінчався на кадрі 10</td><td>Утримання <b>постійно</b> намагається зачепитися</td></tr>
+              <tr><td class="num">18</td><td>«Мінімальний гравець» як тест чесності</td><td>Зрив у нижній точці не дає жодного набору висоти — такий гравець впаде на будь-якій трасі. Міряв складність, не прохідність</td><td>Окремий тест прохідності</td></tr>
+              <tr><td class="num"><b>19</b></td><td>Рівномірна висота анкерів у смузі</td><td><b>0 % прохідних сідів на всіх 30 конфігураціях свипу.</b> Після зриву гравець на висоті ≈ anchorY + ropeLen, і наступний анкер має влучити в кільце 120–260</td><td>Висота <b>відносно попереднього</b> анкера</td></tr>
+              <tr><td class="num">20</td><td>Жадібний вибір зриву з оцінкою «скільки проживу далі»</td><td>Оцінка не враховувала подальших зачеплень і нагороджувала найкоротші утримання: 59 замахів за 7.7 с</td><td>Оцінка за прогресом</td></tr>
+              <tr><td class="num"><b>21</b></td><td>Жорсткий трос без демпфування</td><td><b>«Зачепився і не відпускаю» — безпрограшна стратегія:</b> гравець вічно кружляє, не рухається і не гине. Тест давав 100 % при 1.1 замаху за 15 с</td><td>Ліва <b>межа смерті, що наздоганяє</b>. Прецедент — Avalanche Mode у Super QuickHook</td></tr>
+              <tr><td class="num">22</td><td>Політика «зрив через D кадрів після низу»</td><td>Не керує тим, що визначає політ — <b>кутом запуску</b></td><td>Політика задає кут зриву</td></tr>
+              <tr><td class="num"><b>23</b></td><td>Конус навколо осі +X</td><td>Трейс сіду 1: гравець пролітає під анкером на відстані <b>249 одиниць — у межах троса</b> — і не може зачепитися, бо анкер прямо над ним</td><td>Не конус, а <b>чверть площини: вище і не позаду</b></td></tr>
+              <tr><td class="num"><b>24</b></td><td>Буфер озброювався <b>на відпусканні</b></td><td>Автоперечеплення протягом 80 мс після зриву — <b>відпустити трос неможливо</b>. Гравець висів на одному тросі 460 кадрів</td><td>Буфер тільки на натисканні</td></tr>
+              <tr><td class="num">25</td><td>Константний кут як тест прохідності</td><td>93.1 % на 60 с. Адаптивний depth-1 виявився <b>гіршим</b> (91.1 %) — жадібність на 3 с заводить у глухий кут</td><td>Гейт — <b>об'єднання політик</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Що вийшло краще, ніж планувалося</h3>
+        <div class="callout">
+          <p>Тригонометрія не знадобилася взагалі. Маятник — це позиційне обмеження: проєкція на коло плюс гасіння радіальної складової швидкості, тобто тільки додавання, множення й корінь. Перевірка напрямку — порівняння з константою, а не виклик Math.cos.</p>
+          <div class="who">MathDet.ts вийшов майже порожній</div>
+        </div>
+        <p><code>plan.md</code>, Рішення 2, вимагав таблиць або поліноміальних апроксимацій замість <code>Math.sin/cos</code>, бо їхні реалізації різняться між рушіями. Виявилося, що вони не потрібні: <code>+ − × ÷ sqrt</code> за IEEE 754 задані точно й однаково скрізь. <b>Менше коду — менше місць, де детермінізм може зламатися.</b></p>
+
+        <h3>Стан гейта 1</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:30px">#</th><th>Критерій</th><th>Стан</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>20 ранів підряд без свідомого зусилля</td><td>⏳ потребує людини</td></tr>
+              <tr><td class="num">2</td><td>3 сторонні грають ≥ 10 ранів</td><td>⏳ потребує людини</td></tr>
+              <tr><td class="num">3</td><td>60 FPS на бюджетному Android</td><td>⏳ потребує пристрою</td></tr>
+              <tr><td class="num">4</td><td>Рестарт &lt; 400 мс</td><td><span class="m m-ok">350 мс</span></td></tr>
+              <tr><td class="num">5</td><td>Детермінізм</td><td><span class="m m-ok">6 із 6</span></td></tr>
+              <tr><td class="num">6</td><td>Зачеплення за лінію зрозуміле без пояснень</td><td>⏳ потребує людини</td></tr>
+              <tr><td class="num">7</td><td>60 FPS при 80 лініях</td><td>⏳ потребує пристрою</td></tr>
+              <tr><td>—</td><td>Правило чесності</td><td><span class="m m-bad">94.8 % проти 95 %</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Два застереження, які варто знати зараз</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Траса вийшла майже плоскою</span>
+            <p><code>anchorDyMax = 20</code> — це те, що дало 100 % на свипі. Двадцять одиниць перепаду на екрані 720 × 1280 — це рівна лінія. <strong>Швидше за все, це нудно.</strong> Автотест гарантує, що трасу можна пройти — він нічого не каже про те, чи цікаво. День 5 має підняти перепад, не втративши прохідність.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Свипи показують що, трейс показує чому</span>
+            <p>Три дефекти поспіль я намагався виправити перебором параметрів і щоразу помилявся. Знайшлися вони за тридцять секунд після того, як я надрукував позицію, швидкість і стан кнопки <strong>покадрово</strong>. <code>tools/trace.ts</code> вартий більше за всі три свипи разом.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 13 -->
       <section id="tech">
-        <div class="sec-head"><span class="n">12</span><h2>Технології</h2></div>
+        <div class="sec-head"><span class="n">13</span><h2>Технології</h2></div>
         <p class="lede">Рушій, формат анімації і AI-пайплайн. Головна теза розділу: <b>анімація трансформаціями, а не кадрами</b> — дешевше, легше, надійніше і не залежить від якості AI-генерації.</p>
 
         <h3>Вибір рушія</h3>
@@ -2359,7 +2439,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 08 -->
       <section id="plan">
-        <div class="sec-head"><span class="n">13</span><h2>Реалізація</h2></div>
+        <div class="sec-head"><span class="n">14</span><h2>Реалізація</h2></div>
         <p class="lede">Порядок фаз змінено проти вихідного дослідження: диференціація перевіряється <b>до</b> арту. Якщо соціальна петля не працює, гарний арт її не врятує.</p>
 
         <div class="tl">
@@ -2463,7 +2543,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 07 -->
       <section id="heity">
-        <div class="sec-head"><span class="n">14</span><h2>Гейти</h2></div>
+        <div class="sec-head"><span class="n">15</span><h2>Гейти</h2></div>
         <p class="lede">Чотири точки, у яких проєкт або продовжується, або чесно закривається. Чекбокси зберігаються у вашому браузері.</p>
 
         <div class="grid g2">
@@ -2529,7 +2609,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 10 -->
       <section id="viral">
-        <div class="sec-head"><span class="n">15</span><h2>Віральність</h2></div>
+        <div class="sec-head"><span class="n">16</span><h2>Віральність</h2></div>
         <p class="lede">Три петлі, які треба закодити, а не «зробити потім». Плюс те, що вимірює, чи вони працюють.</p>
 
         <h3>Петля 1 — шер у Telegram</h3>
@@ -2586,7 +2666,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 11 -->
       <section id="hroshi">
-        <div class="sec-head"><span class="n">16</span><h2>Економіка</h2></div>
+        <div class="sec-head"><span class="n">17</span><h2>Економіка</h2></div>
         <p class="lede">Telegram-фаза — це не спосіб заробити. Це спосіб безкоштовно з'ясувати, чи гра комусь потрібна.</p>
 
         <div class="grid g3" style="margin-bottom:26px;">
@@ -2633,7 +2713,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 09 -->
       <section id="ryzyky">
-        <div class="sec-head"><span class="n">17</span><h2>Ризики</h2></div>
+        <div class="sec-head"><span class="n">18</span><h2>Ризики</h2></div>
         <p class="lede">Кожен ризик має місце, де ми його ловимо. Ризик без такого місця — це не ризик, а тривога.</p>
         <div class="scroll">
           <table>
@@ -2659,7 +2739,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 10 -->
       <section id="rish">
-        <div class="sec-head"><span class="n">18</span><h2>Рішення</h2></div>
+        <div class="sec-head"><span class="n">19</span><h2>Рішення</h2></div>
         <div class="scroll">
           <table>
             <thead><tr><th style="width:34px">#</th><th>Питання</th><th>Стан</th></tr></thead>
@@ -2683,7 +2763,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
 
       <!-- 11 -->
       <section id="dzherela">
-        <div class="sec-head"><span class="n">19</span><h2>Файли і джерела</h2></div>
+        <div class="sec-head"><span class="n">20</span><h2>Файли і джерела</h2></div>
 
         <h3>Документи проєкту</h3>
         <div class="files">
@@ -2699,6 +2779,7 @@ step(<i>pointerDown: boolean</i>): void;   <i>// стан кнопки, не п�
           <div class="file"><span class="fn">prototype-1-pavutyna.md</span><span class="fd">Пропрацювання К4: механіка, запозичення, архітектура, план і ризики</span></div>
           <div class="file"><span class="fn">brief-prototype-1.md</span><span class="fd">Технічна специфікація тижня 1: числа, правила, контракти модулів</span></div>
           <div class="file"><span class="fn">assets/shots/</span><span class="fd">12 скріншотів конкурентів зі сторінок публікації</span></div>
+          <div class="file"><span class="fn">game/</span><span class="fd">Код прототипу: sim, тести, інструменти, NOTES.md із десятьма дефектами збірки</span></div>
           <div class="file"><span class="fn">dashboard.html</span><span class="fd">Ця сторінка — зведення всіх документів</span></div>
         </div>
 
