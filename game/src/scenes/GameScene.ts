@@ -4,15 +4,19 @@ import { Simulation } from '../sim/Simulation.ts';
 import { InputTrace } from '../sim/InputTrace.ts';
 import { selectVisible } from '../sim/Web.ts';
 import { selectTarget } from '../sim/Targeting.ts';
+import { buildSwarm, type Attempt, type ReplayTrack } from '../sim/Replay.ts';
 import type { Segment } from '../sim/types.ts';
 
 /**
- * Рендер. Арту немає — усе малюється кодом, як вимагає grey-box.
- * Але «без арту» не означає «нечитабельно»: гравець мусить з першого погляду
- * розуміти, за що він може зачепитися, куди летить і що його вбиває.
+ * Рендер і джус. Арту немає й не повинно бути до тижня 5 — усе малюється кодом.
  *
- * Симуляція нічого не знає ні про Phaser, ні про розмір екрана — цього вимагає
- * детермінізм. Сцена тільки читає стан.
+ * Тиждень 2 додає дві речі з плану:
+ *   • джус: squash & stretch, hit-stop, частинки, спалах, тряска, вібрація;
+ *   • РІЙ НЕВДАЧ — усі спроби на цьому сіді програються одночасно.
+ *     Прецедент — Multi-Play у Super Meat Boy. Це і є артефакт, який потім
+ *     полетить у чат: він показує зусилля, а не число.
+ *
+ * Симуляція нічого не знає ні про Phaser, ні про екран. Сцена тільки читає стан.
  */
 
 const COL = {
@@ -27,24 +31,38 @@ const COL = {
   ownWeb: 0xf0a24a,
   foreignWeb: 0x4fd1bc,
   chase: 0xd6455b,
+  ghost: 0x9fb4c7,
 };
+
+type Mode = 'play' | 'dead' | 'swarm';
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; c: number };
 
 export class GameScene extends Phaser.Scene {
   private sim!: Simulation;
   private trace!: InputTrace;
+  private mode: Mode = 'play';
   private accumulator = 0;
   private pointerDown = false;
   private seed = 1;
   private day = 0;
   private best = 0;
-  private deadAt = -1;
+  private markedAt = -1;
+  private hitStopUntil = 0;
+  private flash = 0;
 
   private foreignWeb: Segment[] = [];
   private trail: { x: number; y: number }[] = [];
+  private particles: Particle[] = [];
+
+  /** Усі спроби на поточному сіді — з них будується рій. */
+  private attempts: Attempt[] = [];
+  private swarm: ReplayTrack[] = [];
+  private swarmFrame = 0;
 
   private gSky!: Phaser.GameObjects.Graphics;
   private gWeb!: Phaser.GameObjects.Graphics;
   private gWorld!: Phaser.GameObjects.Graphics;
+  private gFlash!: Phaser.GameObjects.Graphics;
   private txtScore!: Phaser.GameObjects.Text;
   private txtSub!: Phaser.GameObjects.Text;
   private txtHint!: Phaser.GameObjects.Text;
@@ -55,17 +73,16 @@ export class GameScene extends Phaser.Scene {
     const w = BALANCE.viewWidth;
     const h = BALANCE.bandHeight;
 
-    // Небо — статичний фон, малюється один раз і не рухається з камерою.
     this.gSky = this.add.graphics().setScrollFactor(0).setDepth(-10);
     this.gSky.fillGradientStyle(COL.skyTop, COL.skyTop, COL.skyBottom, COL.skyBottom, 1);
     this.gSky.fillRect(-w, -h, w * 3, h * 3);
 
     this.gWeb = this.add.graphics().setDepth(0);
     this.gWorld = this.add.graphics().setDepth(1);
+    this.gFlash = this.add.graphics().setScrollFactor(0).setDepth(30);
 
     this.txtScore = this.add.text(w / 2, 54, '0', {
-      fontFamily: 'ui-monospace, "SF Mono", monospace',
-      fontSize: '96px', color: '#ffffff',
+      fontFamily: 'ui-monospace, "SF Mono", monospace', fontSize: '96px', color: '#ffffff',
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(20);
 
     this.txtSub = this.add.text(w / 2, 158, '', {
@@ -73,46 +90,57 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(20);
 
     this.txtHint = this.add.text(w / 2, h * 0.62, '', {
-      fontFamily: 'ui-monospace, monospace', fontSize: '40px',
-      color: '#ffffff', align: 'center',
+      fontFamily: 'ui-monospace, monospace', fontSize: '40px', color: '#ffffff', align: 'center',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
-    const down = () => { this.pointerDown = true; };
+    const down = () => { this.onPress(); };
     const up = () => { this.pointerDown = false; };
     this.input.on('pointerdown', down);
     this.input.on('pointerup', up);
     this.input.on('pointerupoutside', up);
     this.input.keyboard?.on('keydown-SPACE', down);
     this.input.keyboard?.on('keyup-SPACE', up);
-    this.input.keyboard?.on('keydown-R', () => this.restart(this.seed + 1));
+    this.input.keyboard?.on('keydown-R', () => this.newSeed());
 
     this.cameras.main.setZoom(0.78);
     this.restart(1);
   }
 
+  /** Натискання означає різне залежно від стану. */
+  private onPress(): void {
+    if (this.mode === 'swarm') { this.endSwarm(); return; }
+    this.pointerDown = true;
+  }
+
+  private newSeed(): void {
+    this.attempts = [];
+    this.foreignWeb = [];
+    this.day = 0;
+    this.best = 0;
+    this.restart(this.seed + 1);
+  }
+
   private restart(seed: number): void {
     // Павутина минулого рану стає «чужою»: так у тижні 1 перевіряється ідея К4
     // без бекенду — чужі лінії симулюються власним попереднім раном.
-    if (this.sim && this.sim.ownWeb.length) {
+    if (this.sim && this.sim.ownWeb.length && seed === this.seed) {
       this.foreignWeb = selectVisible(
-        this.foreignWeb.concat(
-          this.sim.ownWeb.map(s => ({ ...s, ownerId: 1, bornDay: this.day })),
-        ),
+        this.foreignWeb.concat(this.sim.ownWeb.map(s => ({ ...s, ownerId: 1, bornDay: this.day }))),
         BALANCE.foreignLineLimit,
       );
       this.day++;
     }
-    if (seed !== this.seed) { this.foreignWeb = []; this.day = 0; }
     this.seed = seed;
     this.sim = new Simulation(seed, this.foreignWeb);
     this.trace = new InputTrace();
+    this.mode = 'play';
     this.accumulator = 0;
-    this.deadAt = -1;
+    this.markedAt = -1;
     this.trail.length = 0;
+    this.particles.length = 0;
     this.bakeWeb();
   }
 
-  /** Чужа павутина статична за ран — малюється один раз, а не щокадру. */
   private bakeWeb(): void {
     this.gWeb.clear();
     for (const s of this.foreignWeb) {
@@ -123,24 +151,92 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  update(_t: number, delta: number): void {
-    const s = this.sim.state;
+  // ── Джус ──────────────────────────────────────────────────────────────
+  private burst(x: number, y: number, n: number, color: number, power: number): void {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.5;
+      const sp = power * (0.4 + Math.random() * 0.9);
+      this.particles.push({
+        x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - power * 0.2,
+        life: 1, max: 0.35 + Math.random() * 0.4, c: color,
+      });
+    }
+  }
 
-    if (s.alive) {
+  private buzz(ms: number): void {
+    const nav = navigator as Navigator & { vibrate?: (p: number) => boolean };
+    if (typeof nav.vibrate === 'function') nav.vibrate(ms);
+  }
+
+  private onDeath(): void {
+    const s = this.sim.state;
+    this.mode = 'dead';
+    this.markedAt = this.time.now;
+    this.hitStopUntil = this.time.now + 70;     // hit-stop 70 мс
+    this.flash = 0.55;
+    this.cameras.main.shake(180, 0.014);
+    this.burst(s.px, s.py, 22, COL.chase, 520);
+    this.buzz(35);
+
+    this.attempts.push({
+      trace: this.trace, frames: s.frame, score: s.score, index: this.attempts.length + 1,
+    });
+    if (this.attempts.length > 60) this.attempts.shift();
+
+    // Рій показуємо на рекорді — саме тоді він і є історією: «ось усі рази,
+    // коли я ламався, і ось цей». В інших випадках рестарт миттєвий.
+    if (s.score > this.best && this.attempts.length >= 3) {
+      this.best = s.score;
+      this.startSwarm();
+    } else if (s.score > this.best) {
+      this.best = s.score;
+    }
+  }
+
+  private startSwarm(): void {
+    this.mode = 'swarm';
+    this.swarm = buildSwarm(this.seed, this.attempts, this.foreignWeb);
+    this.swarmFrame = 0;
+  }
+
+  private endSwarm(): void {
+    this.swarm = [];
+    this.restart(this.seed);
+  }
+
+  // ── Цикл ──────────────────────────────────────────────────────────────
+  update(_t: number, delta: number): void {
+    const now = this.time.now;
+
+    if (this.mode === 'swarm') {
+      this.stepSwarm();
+      this.drawSwarm();
+      this.decayParticles(delta);
+      return;
+    }
+
+    const s = this.sim.state;
+    if (this.mode === 'play' && now >= this.hitStopUntil) {
       this.accumulator += Math.min(delta, 100) / 1000;
       let steps = 0;
       while (this.accumulator >= BALANCE.dt && steps < BALANCE.maxStepsPerFrame) {
         if (this.trace.isDownAt(s.frame) !== this.pointerDown) {
           this.trace.record(s.frame, this.pointerDown ? 'down' : 'up');
         }
+        const wasAttached = s.attached;
         this.sim.step(this.pointerDown);
+        if (!wasAttached && s.attached) {          // щойно зачепився
+          this.flash = Math.max(this.flash, 0.18);
+          this.burst(s.ax, s.ay, 7, COL.anchorLive, 190);
+          this.buzz(12);
+        }
         this.accumulator -= BALANCE.dt;
         steps++;
         this.trail.push({ x: s.px, y: s.py });
         if (this.trail.length > 26) this.trail.shift();
-        if (!s.alive) { this.deadAt = this.time.now; this.cameras.main.shake(160, 0.012); break; }
+        if (!s.alive) { this.onDeath(); break; }
       }
-    } else if (this.deadAt > 0 && this.time.now - this.deadAt > BALANCE.restartDelayMs) {
+    } else if (this.mode === 'dead' && now - this.markedAt > BALANCE.restartDelayMs) {
       this.restart(this.seed);
     }
 
@@ -148,46 +244,60 @@ export class GameScene extends Phaser.Scene {
     cam.scrollX = s.px - (BALANCE.viewWidth / cam.zoom) * BALANCE.cameraPlayerX;
     cam.scrollY = s.py - (BALANCE.bandHeight / cam.zoom) * 0.5;
 
+    this.decayParticles(delta);
     this.draw();
   }
 
-  private draw(): void {
-    const s = this.sim.state;
-    const g = this.gWorld;
-    const H = BALANCE.bandHeight;
-    g.clear();
-
-    // Земля.
-    g.fillStyle(COL.ground, 1);
-    g.fillRect(s.px - 4000, H, 8000, 900);
-    g.lineStyle(5, 0x2b4a46, 1);
-    g.lineBetween(s.px - 4000, H, s.px + 4000, H);
-
-    // Стіна, що наздоганяє — головна причина не висіти на місці.
-    g.fillStyle(COL.chase, 0.22);
-    g.fillRect(s.killX - 3000, -2000, 3000, H + 4000);
-    g.lineStyle(8, COL.chase, 0.95);
-    g.lineBetween(s.killX, -2000, s.killX, H + 2000);
-    for (let i = 0; i < 14; i++) {
-      const y = -300 + i * 130 + ((s.frame * 2) % 130);
-      g.lineStyle(3, COL.chase, 0.35);
-      g.lineBetween(s.killX - 90, y, s.killX, y + 60);
+  private stepSwarm(): void {
+    // Рій іде трохи швидше за реальний час: 3 кроки на кадр ≈ 1.5×.
+    for (let i = 0; i < 3; i++) {
+      let anyLeft = false;
+      for (const t of this.swarm) { if (!t.done) { t.step(); anyLeft = true; } }
+      this.swarmFrame++;
+      if (!anyLeft) break;
     }
+  }
 
-    // Яка ціль зараз була б захоплена — це головна навчальна підказка гри.
-    const live = s.attached
-      ? null
-      : selectTarget(s.px, s.py, this.sim.track.candidates(s.px), this.foreignWeb.concat(this.sim.ownWeb));
+  private decayParticles(delta: number): void {
+    const dt = Math.min(delta, 60) / 1000;
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.life -= dt / p.max;
+      if (p.life <= 0) { this.particles.splice(i, 1); continue; }
+      p.vy += 1400 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+  }
 
-    // Анкери.
-    const from = s.px - 900;
-    const to = s.px + 1400;
-    for (const a of this.sim.track.anchors) {
+  // ── Малювання ─────────────────────────────────────────────────────────
+  private drawWorld(g: Phaser.GameObjects.Graphics, camX: number, killX: number, frame: number): void {
+    const H = BALANCE.bandHeight;
+    g.fillStyle(COL.ground, 1);
+    g.fillRect(camX - 4000, H, 8000, 900);
+    g.lineStyle(5, 0x2b4a46, 1);
+    g.lineBetween(camX - 4000, H, camX + 4000, H);
+
+    g.fillStyle(COL.chase, 0.22);
+    g.fillRect(killX - 3000, -2000, 3000, H + 4000);
+    g.lineStyle(8, COL.chase, 0.95);
+    g.lineBetween(killX, -2000, killX, H + 2000);
+    for (let i = 0; i < 14; i++) {
+      const y = -300 + i * 130 + ((frame * 2) % 130);
+      g.lineStyle(3, COL.chase, 0.35);
+      g.lineBetween(killX - 90, y, killX, y + 60);
+    }
+  }
+
+  private drawAnchors(g: Phaser.GameObjects.Graphics, sim: Simulation, live: ReturnType<typeof selectTarget>, frame: number): void {
+    const s = sim.state;
+    const from = s.px - 900, to = s.px + 1400;
+    for (const a of sim.track.anchors) {
       if (a.x < from) continue;
       if (a.x > to) break;
       const isLive = !!live && live.kind === 'anchor' && live.x === a.x && live.y === a.y;
       if (isLive) {
-        const pulse = 16 + Math.sin(s.frame * 0.12) * 4;
+        const pulse = 16 + Math.sin(frame * 0.12) * 4;
         g.lineStyle(4, COL.anchorLive, 0.9);
         g.strokeCircle(a.x, a.y, pulse + 10);
       }
@@ -196,8 +306,40 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(isLive ? COL.anchorLive : COL.anchor, 1);
       g.fillCircle(a.x, a.y, 6);
     }
+  }
 
-    // Власні лінії цього рану.
+  /** Squash & stretch: тіло витягується вздовж швидкості. Найдешевший джус. */
+  private drawBody(g: Phaser.GameObjects.Graphics, x: number, y: number, vx: number, vy: number, color: number, alpha: number, r = 15): void {
+    const sp = Math.sqrt(vx * vx + vy * vy);
+    const k = Math.min(0.55, sp / 1600);
+    const ang = Math.atan2(vy, vx);
+    g.save();
+    g.translateCanvas(x, y);
+    g.rotateCanvas(ang);
+    g.fillStyle(color, alpha);
+    g.fillEllipse(0, 0, r * 2 * (1 + k), r * 2 * (1 - k * 0.7));
+    g.restore();
+  }
+
+  private drawParticles(g: Phaser.GameObjects.Graphics): void {
+    for (const p of this.particles) {
+      const sz = 3 + p.life * 7;
+      g.fillStyle(p.c, Math.min(1, p.life));
+      g.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
+    }
+  }
+
+  private draw(): void {
+    const s = this.sim.state;
+    const g = this.gWorld;
+    g.clear();
+
+    this.drawWorld(g, s.px, s.killX, s.frame);
+
+    const live = s.attached ? null
+      : selectTarget(s.px, s.py, this.sim.track.candidates(s.px), this.foreignWeb.concat(this.sim.ownWeb));
+    this.drawAnchors(g, this.sim, live, s.frame);
+
     for (const w of this.sim.ownWeb) {
       g.lineStyle(BALANCE.lineVisualWidth + 3, COL.ownWeb, 0.14);
       g.lineBetween(w.ax, w.ay, w.bx, w.by);
@@ -205,7 +347,6 @@ export class GameScene extends Phaser.Scene {
       g.lineBetween(w.ax, w.ay, w.bx, w.by);
     }
 
-    // Слід гравця — читабельність напрямку й швидкості.
     for (let i = 1; i < this.trail.length; i++) {
       const a = this.trail[i - 1], b = this.trail[i];
       const k = i / this.trail.length;
@@ -213,7 +354,6 @@ export class GameScene extends Phaser.Scene {
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
 
-    // Трос.
     if (s.attached) {
       g.lineStyle(9, COL.rope, 0.25);
       g.lineBetween(s.ax, s.ay, s.px, s.py);
@@ -222,36 +362,77 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(COL.anchorLive, 1);
       g.fillCircle(s.ax, s.ay, 9);
     } else if (live) {
-      // Пунктир до цілі: показує, що станеться, якщо натиснути ЗАРАЗ.
-      const dx = live.x - s.px, dy = live.y - s.py;
-      const n = 9;
-      for (let i = 0; i < n; i++) {
-        if (i % 2) continue;
+      const dx = live.x - s.px, dy = live.y - s.py, n = 9;
+      for (let i = 0; i < n; i += 2) {
         g.lineStyle(3, COL.anchorLive, 0.5);
         g.lineBetween(s.px + (dx * i) / n, s.py + (dy * i) / n,
                       s.px + (dx * (i + 1)) / n, s.py + (dy * (i + 1)) / n);
       }
     }
 
-    // Гравець.
     g.fillStyle(0x000000, 0.25);
     g.fillCircle(s.px, s.py + 4, 17);
-    g.fillStyle(s.alive ? COL.player : COL.chase, 1);
-    g.fillCircle(s.px, s.py, 15);
-    g.lineStyle(3, 0xffffff, 0.9);
-    g.strokeCircle(s.px, s.py, 15);
+    this.drawBody(g, s.px, s.py, s.vx, s.vy, s.alive ? COL.player : COL.chase, 1);
+    this.drawParticles(g);
 
-    // HUD.
-    if (s.score > this.best) this.best = s.score;
+    this.drawFlash();
+
+    if (s.score > this.best && this.mode === 'play') this.best = s.score;
     this.txtScore.setText(String(s.score));
-    this.txtSub.setText(`рекорд ${this.best}    сід ${this.seed}    ліній ${this.sim.ownWeb.length + this.foreignWeb.length}`);
+    this.txtSub.setText(`рекорд ${this.best}    спроба ${this.attempts.length + 1}    ліній ${this.sim.ownWeb.length + this.foreignWeb.length}`);
+    this.txtHint.setText(
+      this.mode === 'dead' ? ''
+      : s.frame < 150 && !s.attached ? 'ТРИМАЙ — чіпляєшся\nВІДПУСТИ — летиш'
+      : '',
+    );
+  }
 
-    if (!s.alive) {
-      this.txtHint.setText('ТИ ВПАВ\nще раз');
-    } else if (s.frame < 150 && !s.attached) {
-      this.txtHint.setText('ТРИМАЙ ПАЛЕЦЬ — чіпляєшся\nВІДПУСТИ — летиш');
-    } else {
-      this.txtHint.setText('');
+  private drawSwarm(): void {
+    const g = this.gWorld;
+    g.clear();
+
+    // Камера йде за найдальшим із рою — це і є «переможець».
+    let lead = this.swarm[0];
+    for (const t of this.swarm) if (t.sim.state.px > lead.sim.state.px) lead = t;
+    const ls = lead.sim.state;
+    const cam = this.cameras.main;
+    cam.scrollX = ls.px - (BALANCE.viewWidth / cam.zoom) * BALANCE.cameraPlayerX;
+    cam.scrollY = ls.py - (BALANCE.bandHeight / cam.zoom) * 0.5;
+
+    this.drawWorld(g, ls.px, ls.killX, this.swarmFrame);
+    this.drawAnchors(g, lead.sim, null, this.swarmFrame);
+
+    let died = 0;
+    for (const t of this.swarm) {
+      const st = t.sim.state;
+      const isLead = t === lead;
+      if (!st.alive) died++;
+
+      if (st.attached) {
+        g.lineStyle(isLead ? 4 : 2, isLead ? COL.rope : COL.ghost, isLead ? 1 : 0.25);
+        g.lineBetween(st.ax, st.ay, st.px, st.py);
+      }
+      this.drawBody(
+        g, st.px, st.py, st.vx, st.vy,
+        !st.alive ? COL.chase : isLead ? COL.player : COL.ghost,
+        !st.alive ? 0.35 : isLead ? 1 : 0.4,
+        isLead ? 15 : 11,
+      );
     }
+
+    this.drawParticles(g);
+    this.drawFlash();
+
+    this.txtScore.setText(String(lead.attempt.score));
+    this.txtSub.setText(`${this.swarm.length} спроб одночасно · загинуло ${died}`);
+    this.txtHint.setText('НОВИЙ РЕКОРД\nусі твої спроби разом\n\nтапни, щоб грати');
+  }
+
+  private drawFlash(): void {
+    this.gFlash.clear();
+    if (this.flash <= 0.01) return;
+    this.gFlash.fillStyle(0xffffff, this.flash);
+    this.gFlash.fillRect(-200, -200, BALANCE.viewWidth + 400, BALANCE.bandHeight + 400);
+    this.flash *= 0.82;
   }
 }
