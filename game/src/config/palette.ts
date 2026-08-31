@@ -26,6 +26,23 @@ export const COL = {
   bgNear: 0x0d1d24,
 } as const;
 
+/**
+ * Скіни. Кожен — просто інший тінт того самого кадру hero, тобто НУЛЬ
+ * додаткових кадрів в атласі. Саме це дозволяє бюджет кадрів плану
+ * (розділ 9): «не генерувати те, що малюється кодом».
+ */
+export const SKINS: Record<string, { hero: number; trail: number; title: string }> = {
+  amber: { hero: 0xffb347, trail: 0xff8c42, title: 'Бурштиновий слід' },
+};
+
+export function skinHero(skin: string | null): number {
+  return (skin && SKINS[skin]?.hero) || COL.player;
+}
+
+export function skinTrail(skin: string | null): number {
+  return (skin && SKINS[skin]?.trail) || COL.trail;
+}
+
 /** 0xRRGGBB → [r, g, b]. Потрібно генератору, який працює побайтово. */
 export function rgb(hex: number): [number, number, number] {
   return [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];

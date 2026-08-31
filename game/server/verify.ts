@@ -3,6 +3,7 @@ import { InputTrace } from '../src/sim/InputTrace.ts';
 import { buildFromTraces } from '../src/sim/Web.ts';
 import { selectVisible } from '../src/sim/Web.ts';
 import { BALANCE } from '../src/config/balance.ts';
+import { playTrace } from '../src/sim/playback.ts';
 import type { Segment } from '../src/sim/types.ts';
 
 /**
@@ -36,7 +37,7 @@ export type StoredRun = {
 };
 
 export type VerifyResult =
-  | { ok: true; score: number; frames: number; foreignHooks: number; webHooks: number }
+  | { ok: true; score: number; frames: number; foreignHooks: number; webHooks: number; revives: number }
   | { ok: false; reason: string };
 
 /** Ліміти, які роблять підробку дорожчою за чесну гру. */
@@ -71,11 +72,16 @@ export function verifyRun(
   // симуляція розійдеться й чесний ран буде відхилено.
   const web = buildWeb(run.seed, webRuns);
 
+  // Стеля воскресінь перевіряється ДО програвання: інакше трек із сотнею
+  // воскресінь коштував би нам повного перерахунку, перш ніж бути
+  // відхиленим. Саму симуляцію це теж обмежує, але тут дешевше.
+  if (trace.reviveCount > BALANCE.reviveMaxPerRun) {
+    return { ok: false, reason: `воскресінь у треку ${trace.reviveCount}, стеля ${BALANCE.reviveMaxPerRun}` };
+  }
+
   const sim = new Simulation(run.seed, web);
   const limit = Math.min(run.frames + 2, MAX_FRAMES);
-  for (let f = 0; f < limit && sim.state.alive; f++) {
-    sim.step(trace.isDownAt(f));
-  }
+  playTrace(sim, trace, limit);
 
   const s = sim.state;
   if (s.alive && run.frames < MAX_FRAMES) {
@@ -90,7 +96,13 @@ export function verifyRun(
 
   // foreignHooks рахує САМ сервер під час переграваня — це головна метрика
   // концепту К4, і клієнт не може її накрутити.
-  return { ok: true, score: s.score, frames: s.frame, foreignHooks: s.foreignHooks, webHooks: s.webHooks };
+  // revives теж рахує сервер: далі за ним списуються куплені продовження.
+  // Заявити менше, ніж використав, — не вийде, бо число береться з
+  // переграваня, а не з тіла запиту.
+  return {
+    ok: true, score: s.score, frames: s.frame,
+    foreignHooks: s.foreignHooks, webHooks: s.webHooks, revives: s.revives,
+  };
 }
 
 /** Павутина з чужих ранів. Порядок детермінований — сортування за id. */

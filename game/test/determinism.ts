@@ -2,6 +2,7 @@ import { Simulation } from '../src/sim/Simulation.ts';
 import { InputTrace } from '../src/sim/InputTrace.ts';
 import { buildFromTraces } from '../src/sim/Web.ts';
 import { runMinimalPlayer } from './minimalPlayer.ts';
+import { playTrace } from '../src/sim/playback.ts';
 
 /**
  * Гейт 1, критерій 5: той самий сід + той самий ввід = той самий результат.
@@ -22,7 +23,7 @@ function stateSignature(sim: Simulation): string {
 
 function replay(seed: number, trace: InputTrace, frames: number): Simulation {
   const sim = new Simulation(seed, []);
-  for (let f = 0; f < frames && sim.state.alive; f++) sim.step(trace.isDownAt(f));
+  playTrace(sim, trace, frames);
   return sim;
 }
 

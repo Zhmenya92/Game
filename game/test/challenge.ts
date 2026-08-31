@@ -169,8 +169,8 @@ await (async () => {
   ok('після чужої траси відповідь усе ще одна', mid.challengeReplies === 1,
     String(mid.challengeReplies));
 
-  for (let i = 0; i < 3; i++) await post('/api/event', { name: 'run_end' });
-  await post('/api/event', { name: 'share_click' });
+  for (let i = 0; i < 3; i++) await post('/api/event', { initData: A, name: 'run_end' });
+  await post('/api/event', { initData: A, name: 'share_click' });
 
   const m = await (await fetch(B + '/api/metrics')).json() as Record<string, any>;
   ok('метрики бачать виклик, відкриття й відповідь',

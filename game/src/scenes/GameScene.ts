@@ -9,7 +9,8 @@ import { buildFromTraces } from '../sim/Web.ts';
 import { api, type RemoteRun } from '../net/api.ts';
 import { telegram } from '../net/telegram.ts';
 import type { Segment } from '../sim/types.ts';
-import { COL } from '../config/palette.ts';
+import { COL, skinHero, skinTrail } from '../config/palette.ts';
+import { ads } from '../net/ads.ts';
 import { SpritePool } from '../render/SpritePool.ts';
 import * as S from '../render/scene.ts';
 import type { View } from '../render/scene.ts';
@@ -37,7 +38,12 @@ const ZOOM = 0.78;
 const VIEW_W = BALANCE.viewWidth / ZOOM;
 const VIEW_H = BALANCE.bandHeight / ZOOM;
 
-type Mode = 'play' | 'dead' | 'swarm';
+/**
+ * 'offer' — коротка пропозиція продовжити після хорошого рану (тиждень 6).
+ * Окремий стан, бо звичайна смерть мусить лишатися МИТТЄВОЮ: гейт 1 вимагає
+ * рестарту менше ніж за 400 мс, і пропозиція на кожну смерть його вбила б.
+ */
+type Mode = 'play' | 'dead' | 'offer' | 'swarm';
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; c: number };
 
 export class GameScene extends Phaser.Scene {
@@ -73,6 +79,21 @@ export class GameScene extends Phaser.Scene {
   private lastRunId: string | null = null;
   private shareNote = '';
   private btnShare!: Phaser.GameObjects.Text;
+
+  /** Монетизація й аналітика, тиждень 6. */
+  private revives = 0;
+  private skin: string | null = null;
+  private offerUntil = 0;
+  private offerNote = '';
+  private busy = false;
+  private runStartedAt = 0;
+  /** Найкращий чужий рахунок на цьому сіді — для події ghost_beaten. */
+  private rivalBest = 0;
+  private beatenSent = false;
+  private starsAvailable = false;
+  private devGrant = false;
+  private btnContinue!: Phaser.GameObjects.Text;
+  private btnAd!: Phaser.GameObjects.Text;
 
   private atlasError = '';
   /** Гра не запустилась: симуляції немає, цикл не має чого крутити. */
@@ -140,6 +161,25 @@ export class GameScene extends Phaser.Scene {
       void this.share();
     });
 
+    // Дві кнопки пропозиції. Живуть лише в режимі 'offer'.
+    this.btnContinue = this.add.text(w / 2, h * 0.52, '', {
+      fontFamily: 'ui-monospace, monospace', fontSize: '40px', color: '#0a1420',
+      backgroundColor: '#ffe9a8', padding: { x: 34, y: 18 }, align: 'center',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false).setInteractive();
+    this.btnContinue.on('pointerdown', (_p: unknown, _x: number, _y: number, e: { stopPropagation: () => void }) => {
+      e?.stopPropagation?.();
+      void this.useContinue();
+    });
+
+    this.btnAd = this.add.text(w / 2, h * 0.62, '', {
+      fontFamily: 'ui-monospace, monospace', fontSize: '34px', color: '#0a1420',
+      backgroundColor: '#4fd1bc', padding: { x: 30, y: 16 }, align: 'center',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false).setInteractive();
+    this.btnAd.on('pointerdown', (_p: unknown, _x: number, _y: number, e: { stopPropagation: () => void }) => {
+      e?.stopPropagation?.();
+      void this.earnContinue();
+    });
+
     const down = () => { this.onPress(); };
     const up = () => { this.pointerDown = false; };
     this.input.on('pointerdown', down);
@@ -174,6 +214,15 @@ ${this.atlasError || 'немає текстури atlas'}
     this.online = !!ses?.ok;
     void api.event('app_open');
     if (!this.online) { this.netNote = 'офлайн'; return; }
+    this.revives = ses?.revives ?? 0;
+    this.skin = ses?.skin ?? null;
+    const sh = await api.shop();
+    if (sh?.ok) {
+      this.revives = sh.revives;
+      this.skin = sh.skin ?? this.skin;
+      this.starsAvailable = sh.starsAvailable;
+      this.devGrant = !!sh.devGrant;
+    }
     this.netNote = telegram.inside ? `Telegram ${telegram.version}` : 'браузер';
 
     // Діп-лінк: t.me/<bot>/<app>?startapp=<токен> (plan.md, 8.2).
@@ -237,6 +286,11 @@ ${this.atlasError || 'немає текстури atlas'}
   /** Забрати чужі рани для сіду й перебудувати павутину. */
   private async loadSeed(seed: number): Promise<void> {
     this.remoteRuns = await api.runs(seed);
+    // З ким саме змагаємось. Якщо прийшли за викликом — з тим, хто кинув;
+    // інакше — з найкращим чужим раном на цій трасі.
+    this.rivalBest = this.incomingToken
+      ? this.challengerScore
+      : this.remoteRuns.reduce((m, r) => Math.max(m, r.score), 0);
     this.attempts = [];
     this.best = 0;
     // Рекорд належав минулій трасі — виклик за ним кинути вже не можна.
@@ -264,6 +318,8 @@ ${this.atlasError || 'немає текстури atlas'}
   /** Натискання означає різне залежно від стану. */
   private onPress(): void {
     if (this.mode === 'swarm') { this.endSwarm(); return; }
+    // Тап повз кнопки = «ні, дякую». Пропозиція не має ставати перешкодою.
+    if (this.mode === 'offer') { this.declineOffer(); return; }
     this.pointerDown = true;
   }
 
@@ -298,7 +354,10 @@ ${this.atlasError || 'немає текстури atlas'}
     this.markedAt = -1;
     this.trail.length = 0;
     this.particles.length = 0;
+    this.runStartedAt = this.time.now;
+    this.beatenSent = false;
     this.bakeWeb();
+    if (this.online) void api.event('run_start', { seed, attempt: this.attempts.length + 1 });
   }
 
 
@@ -328,6 +387,39 @@ ${this.atlasError || 'немає текстури atlas'}
     this.burst(s.px, s.py, 22, COL.chase, 520);
     this.buzz('fail');
 
+    const cause = this.sim.result()?.deathReason ?? 'fell';
+    if (this.online) {
+      void api.event('run_end', {
+        score: s.score,
+        ms: Math.round(this.time.now - this.runStartedAt),
+        cause,
+        revives: s.revives,
+      });
+    }
+
+    // Пропозиція продовжити — тільки після ЗМІСТОВНОГО рану. Інакше вона
+    // з'являлася б на кожній смерті через дві секунди й перетворила б
+    // миттєвий рестарт (гейт 1) на клікер по банерах.
+    if (this.canOffer(s.score)) {
+      this.mode = 'offer';
+      this.offerUntil = this.time.now + 4000;
+      this.offerNote = '';
+      this.refreshOffer();
+      return;
+    }
+
+    this.finishRun();
+  }
+
+  /**
+   * Ран остаточно завершено: спроба лягає в рій, ран іде на сервер.
+   *
+   * Окремий метод, бо викликається з двох місць — звичайної смерті й
+   * відмови від продовження. Поки це був хвіст `onDeath`, друге місце
+   * просто не надсилало ран, і рекорд із продовженням зникав.
+   */
+  private finishRun(): void {
+    const s = this.sim.state;
     this.attempts.push({
       trace: this.trace, frames: s.frame, score: s.score, index: this.attempts.length + 1,
     });
@@ -342,6 +434,130 @@ ${this.atlasError || 'немає текстури atlas'}
     } else if (s.score > this.best) {
       this.best = s.score;
     }
+  }
+
+  // ── Продовження (plan.md, 10.2) ───────────────────────────────────────
+
+  /**
+   * Чи пропонувати продовження. Три умови, і кожна має причину:
+   *   • ран був змістовним — інакше банер вискакує кожні дві секунди й
+   *     ламає миттєвий рестарт, якого вимагає гейт 1;
+   *   • стеля воскресінь на ран не вибрана — її перевіряє й сервер;
+   *   • є чим продовжити або є де взяти.
+   */
+  private canOffer(score: number): boolean {
+    if (!this.online) return false;
+    if (this.sim.state.revives >= BALANCE.reviveMaxPerRun) return false;
+    if (score < Math.max(60, Math.floor(this.best * 0.7))) return false;
+    return this.revives > 0 || ads.configured || this.starsAvailable || this.devGrant;
+  }
+
+  private refreshOffer(): void {
+    const canBuy = this.starsAvailable || this.devGrant;
+    this.btnContinue.setVisible(this.revives > 0)
+      .setText(`ПРОДОВЖИТИ  ×${this.revives}`);
+    if (ads.configured) {
+      this.btnAd.setVisible(true).setText('РЕКЛАМА  +1');
+    } else if (canBuy) {
+      this.btnAd.setVisible(true).setText('3 ПРОДОВЖЕННЯ  25 ⭐');
+    } else {
+      this.btnAd.setVisible(false);
+    }
+  }
+
+  private hideOffer(): void {
+    this.btnContinue.setVisible(false);
+    this.btnAd.setVisible(false);
+  }
+
+  /** Відмова або таймаут: ран завершується як звичайна смерть. */
+  private declineOffer(): void {
+    if (this.mode !== 'offer') return;
+    this.mode = 'dead';
+    this.markedAt = this.time.now;
+    this.hideOffer();
+    this.finishRun();
+  }
+
+  /**
+   * Витратити продовження.
+   *
+   * Воскресіння записується В ТРЕК. Без цього сервер переграє ран без
+   * воскресіння, отримає менший рахунок і відхилить ЧЕСНИЙ ран як накрутку.
+   */
+  private async useContinue(): Promise<void> {
+    if (this.busy || this.mode !== 'offer') return;
+    if (this.revives <= 0) { this.offerNote = 'продовжень немає'; return; }
+    this.busy = true;
+    // Спершу оплата, потім воскресіння. Зворотний порядок — це дірка
+    // в економіці: гравець воскресає й просто не надсилає ран (дефект 51).
+    const paid = await api.reserveRevive();
+    if (!paid?.ok) {
+      this.offerNote = paid?.reason ?? 'сервер не підтвердив';
+      this.busy = false;
+      return;
+    }
+    this.revives = paid.revives ?? Math.max(0, this.revives - 1);
+    if (this.sim.revive()) {
+      this.trace.record(this.sim.state.frame, 'revive');
+      this.mode = 'play';
+      this.offerUntil = 0;
+      this.hideOffer();
+      this.flash = Math.max(this.flash, 0.35);
+      this.buzz('heavy');
+      this.burst(this.sim.state.px, this.sim.state.py, 14, COL.anchorLive, 260);
+    } else {
+      this.offerNote = 'більше не можна';
+    }
+    this.busy = false;
+  }
+
+  /**
+   * Дістати продовження: реклама, якщо налаштована, інакше покупка.
+   *
+   * Реклама НЕ нараховує нічого сама: нарахування робить серверний колбек
+   * Adsgram із секретом. Тому після показу баланс просто перечитується —
+   * якщо колбек не прийшов, продовження не буде, і це правильно.
+   */
+  private async earnContinue(): Promise<void> {
+    if (this.busy || this.mode !== 'offer') return;
+    this.busy = true;
+    this.offerUntil = this.time.now + 60000;   // поки триває реклама чи оплата
+    try {
+      if (ads.configured) {
+        void api.event('ad_offer', { score: this.sim.state.score });
+        this.offerNote = 'реклама…';
+        const shown = await ads.show();
+        if (!shown) { this.offerNote = 'реклами немає'; return; }
+        this.offerNote = 'зараховуємо…';
+        await this.refreshWallet(1500);
+      } else {
+        this.offerNote = 'оплата…';
+        const inv = await api.invoice('revive3');
+        if (!inv?.ok) { this.offerNote = inv?.reason ?? 'магазин недоступний'; return; }
+        if (inv.dev) {
+          this.revives = inv.revives ?? this.revives;
+          this.offerNote = inv.note ?? 'видано в режимі розробки';
+        } else if (inv.link) {
+          const st = await telegram.openInvoice(inv.link);
+          if (st !== 'paid') { this.offerNote = st === 'cancelled' ? 'скасовано' : st; return; }
+          void api.event('iap_purchased', { product: 'revive3' });
+          await this.refreshWallet(0);
+        }
+      }
+      if (this.revives > 0) this.offerNote = '';
+    } finally {
+      this.busy = false;
+      this.offerUntil = this.time.now + 6000;
+      this.refreshOffer();
+    }
+  }
+
+  /** Перечитати баланс із сервера. Клієнт свій баланс не вигадує. */
+  private async refreshWallet(delayMs: number): Promise<void> {
+    if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
+    const sh = await api.shop();
+    if (sh?.ok) this.revives = sh.revives;
   }
 
   /** Рахунок перевіряє сервер, переграючи трек. Клієнту не вірять. */
@@ -418,6 +634,9 @@ ${this.atlasError || 'немає текстури atlas'}
       }
     } else if (this.mode === 'dead' && now - this.markedAt > BALANCE.restartDelayMs) {
       this.restart(this.seed);
+    } else if (this.mode === 'offer' && now > this.offerUntil) {
+      // Мовчання — теж відповідь. Гра не має чекати рішення нескінченно.
+      this.declineOffer();
     }
 
     const cam = this.cameras.main;
@@ -481,20 +700,28 @@ ${this.atlasError || 'немає текстури atlas'}
       : selectTarget(s.px, s.py, this.sim.track.candidates(s.px), this.foreignWeb.concat(this.sim.ownWeb));
     S.drawAnchors(p, this.sim.track.anchors, s.px, live, s.frame);
     S.drawOwnWeb(p, this.sim.ownWeb);
-    S.drawTrail(p, this.trail);
+    S.drawTrail(p, this.trail, skinTrail(this.skin));
     S.drawRope(p, s, live);
     S.drawShadow(p, s.px, s.py);
-    S.drawBody(p, s.px, s.py, s.vx, s.vy, s.alive ? COL.player : COL.chase, 1);
+    S.drawBody(p, s.px, s.py, s.vx, s.vy, s.alive ? skinHero(this.skin) : COL.chase, 1);
     S.drawParticles(p, this.particles);
     S.drawFlash(p, v, this.flash);
     this.flash *= 0.82;
     p.end();
 
     if (s.score > this.best && this.mode === 'play') this.best = s.score;
+    // «Обійшов конкретного друга» — прямий вимір того, чи працює
+    // диференціація (plan.md, 10.1). Шлеться один раз за ран.
+    if (!this.beatenSent && this.online && this.rivalBest > 0 && s.score > this.rivalBest) {
+      this.beatenSent = true;
+      void api.event('ghost_beaten', { score: s.score, rival: this.rivalBest });
+    }
     this.txtScore.setText(String(s.score));
     this.txtSub.setText(`рекорд ${this.best}   спроба ${this.attempts.length + 1}   ліній ${this.sim.ownWeb.length + this.foreignWeb.length}` + (this.netNote ? `   ${this.netNote}` : ''));
     this.txtHint.setText(
-      this.mode === 'dead' ? ''
+      this.mode === 'offer'
+        ? `ЩЕ РАЗ ІЗ ЦЬОГО МІСЦЯ?\nрахунок ${s.score} лишається${this.offerNote ? '\n' + this.offerNote : ''}`
+      : this.mode === 'dead' ? ''
       : s.frame < 150 && this.incomingToken
         ? `ТЕБЕ ВИКЛИКАЛИ\nйого рахунок ${this.challengerScore}\nта сама траса`
       : s.frame < 150 && !s.attached ? 'ТРИМАЙ — чіпляєшся\nВІДПУСТИ — летиш'

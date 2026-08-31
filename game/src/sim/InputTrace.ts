@@ -6,7 +6,12 @@
  * цей стан відтворити. Так виправлено дефект 14 ревізії брифа.
  */
 
-export type InputEventType = 'down' | 'up';
+/**
+ * 'revive' додано в тижні 6. Воскресіння мусить бути ПОДІЄЮ ТРЕКУ, а не
+ * станом клієнта: сервер перевіряє рахунок переграванням, і якщо гравець
+ * воскрес, а в треку цього немає, чесний ран буде відхилено як накрутка.
+ */
+export type InputEventType = 'down' | 'up' | 'revive';
 export type InputEvent = { frame: number; type: InputEventType };
 
 export class InputTrace {
@@ -15,18 +20,45 @@ export class InputTrace {
   record(frame: number, type: InputEventType): void {
     const last = this.events[this.events.length - 1];
     // Дедуп: два 'down' підряд не мають сенсу і псують відтворення.
-    if (last && last.type === type) return;
+    // Воскресіння з-під дедупу виведене: два поспіль — це два різні
+    // воскресіння, і злити їх в одне означає розійтися з симуляцією.
+    if (type !== 'revive' && last && last.type === type) return;
     this.events.push({ frame, type });
+    this.reviveFrames_ = null;
   }
 
-  /** Стан кнопки на заданому кадрі. */
+  /** Кадри, на яких гравець воскресав. Рахується один раз і кешується. */
+  private reviveFrames_: Set<number> | null = null;
+
+  /** Стан кнопки на заданому кадрі. Воскресіння кнопки не чіпає. */
   isDownAt(frame: number): boolean {
     let down = false;
     for (const e of this.events) {
       if (e.frame > frame) break;
+      if (e.type === 'revive') continue;
       down = e.type === 'down';
     }
     return down;
+  }
+
+  /**
+   * Чи є воскресіння на цьому кадрі.
+   *
+   * Через Set, а не лінійним пошуком, як `isDownAt`: перевірка робиться
+   * щокадру, а воскресінь у треку одиниці. Кеш скидається на `record`.
+   */
+  isReviveAt(frame: number): boolean {
+    if (!this.reviveFrames_) {
+      this.reviveFrames_ = new Set(
+        this.events.filter(e => e.type === 'revive').map(e => e.frame));
+    }
+    return this.reviveFrames_.has(frame);
+  }
+
+  get reviveCount(): number {
+    let n = 0;
+    for (const e of this.events) if (e.type === 'revive') n++;
+    return n;
   }
 
   /**
@@ -39,7 +71,7 @@ export class InputTrace {
       const e = this.events[i];
       out[i * 3] = e.frame & 0xff;
       out[i * 3 + 1] = (e.frame >> 8) & 0xff;
-      out[i * 3 + 2] = e.type === 'down' ? 1 : 0;
+      out[i * 3 + 2] = e.type === 'down' ? 1 : e.type === 'revive' ? 2 : 0;
     }
     return out;
   }
@@ -49,7 +81,7 @@ export class InputTrace {
     for (let i = 0; i + 2 < bytes.length; i += 3) {
       t.events.push({
         frame: bytes[i] | (bytes[i + 1] << 8),
-        type: bytes[i + 2] === 1 ? 'down' : 'up',
+        type: bytes[i + 2] === 1 ? 'down' : bytes[i + 2] === 2 ? 'revive' : 'up',
       });
     }
     return t;

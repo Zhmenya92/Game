@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { Simulation } from '../src/sim/Simulation.ts';
 import { runAdaptivePlayer } from '../test/capablePlayer.ts';
+import { playTrace, stepTrace } from '../src/sim/playback.ts';
 import type { Segment } from '../src/sim/types.ts';
 import { selectTarget } from '../src/sim/Targeting.ts';
 import { BALANCE } from '../src/config/balance.ts';
@@ -49,7 +50,7 @@ const first = runAdaptivePlayer(seed, 4000);
 const foreignWeb: Segment[] = [];
 {
   const a = new Simulation(seed, []);
-  for (let f = 0; f < first.frames && a.state.alive; f++) a.step(first.trace.isDownAt(f));
+  playTrace(a, first.trace, first.frames);
   for (const s of a.ownWeb) foreignWeb.push({ ...s, ownerId: 7 });
 }
 
@@ -59,7 +60,7 @@ const st = sim.state;
 const trail: { x: number; y: number }[] = [];
 const stopAt = Math.min(untilFrame, second.frames);
 for (let f = 0; f < stopAt && st.alive; f++) {
-  sim.step(second.trace.isDownAt(f));
+  stepTrace(sim, second.trace, f);
   trail.push({ x: st.px, y: st.py });
   if (trail.length > 26) trail.shift();
 }

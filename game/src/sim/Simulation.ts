@@ -24,6 +24,8 @@ export type SimState = {
   foreignHooks: number;
   /** Скільки разів за будь-яку лінію павутини. */
   webHooks: number;
+  /** Скільки разів гравець воскресав. Сервер звіряє це з покупками. */
+  revives: number;
 };
 
 export type SimResult = {
@@ -69,6 +71,7 @@ export class Simulation {
       ropeLen: 0,
       attachedToAnchor: false,
       alive: true,
+      revives: 0,
       score: 0,
       killX: BALANCE.startX - BALANCE.chaseHeadStart,
       foreignHooks: 0,
@@ -184,6 +187,37 @@ export class Simulation {
 
   result(): SimResult | null {
     return this.result_;
+  }
+
+  /**
+   * Воскресіння (continue). Тиждень 6.
+   *
+   * Детерміноване й без подарунків: позиція по X НЕ змінюється, бо рахунок
+   * рахується як floor(px/10) — зсунути гравця вперед означало б продавати
+   * очки. Замість цього відсувається стіна, тобто купується ЧАС, а не
+   * відстань.
+   *
+   * Повертає false, якщо воскресати не можна: тоді клієнт не має права
+   * записувати подію в трек, а сервер такий трек відхилить.
+   */
+  revive(): boolean {
+    const s = this.state;
+    if (s.alive) return false;
+    if (s.revives >= BALANCE.reviveMaxPerRun) return false;
+
+    s.revives += 1;
+    s.alive = true;
+    s.attached = false;
+    s.attachedToAnchor = false;
+    s.py = BALANCE.bandHeight * BALANCE.reviveHeight;
+    s.vx = this.baseSpeedNow();
+    s.vy = 0;
+    s.killX = s.px - BALANCE.reviveWallGap;
+    this.currentTarget = null;
+    this.prevDown = false;
+    this.bufferUntilFrame = -1;
+    this.result_ = null;
+    return true;
   }
 
   /**

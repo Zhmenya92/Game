@@ -22,6 +22,8 @@ type WebApp = {
   disableVerticalSwipes?: () => void;
   HapticFeedback?: Haptic;
   initDataUnsafe?: { start_param?: string };
+  /** З Bot API 6.1. Старіші клієнти методу не мають — перевіряємо окремо. */
+  openInvoice?: (url: string, cb?: (status: string) => void) => void;
 };
 
 function api(): WebApp | null {
@@ -66,6 +68,28 @@ export const telegram = {
     try { a.ready?.(); } catch { /* старий клієнт */ }
     try { a.expand?.(); } catch { /* до 6.1 методу немає */ }
     try { a.disableVerticalSwipes?.(); } catch { /* з 7.7 */ }
+  },
+
+  /**
+   * Відкрити інвойс Stars. З'явився в Bot API 6.1, тож на старих клієнтах
+   * методу просто немає — повертаємо 'unavailable', а не падаємо.
+   *
+   * Статуси Telegram: paid | cancelled | failed | pending.
+   */
+  openInvoice(url: string): Promise<string> {
+    const a = api();
+    if (!a || typeof a.openInvoice !== 'function') return Promise.resolve('unavailable');
+    return new Promise(resolve => {
+      let done = false;
+      const finish = (st: string) => { if (!done) { done = true; resolve(st); } };
+      try {
+        a.openInvoice!(url, finish);
+      } catch {
+        finish('failed');
+      }
+      // Страховка: якщо клієнт не покличе колбек, промис не має висіти вічно.
+      setTimeout(() => finish('pending'), 180000);
+    });
   },
 
   /** Тактильний відгук. Усередині Telegram — рідний, поза ним — вібрація. */

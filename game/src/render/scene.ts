@@ -110,11 +110,11 @@ export function drawOwnWeb(p: Painter, web: readonly Segment[]): void {
   }
 }
 
-export function drawTrail(p: Painter, trail: Trail): void {
+export function drawTrail(p: Painter, trail: Trail, color: number = COL.trail): void {
   for (let i = 1; i < trail.length; i++) {
     const a = trail[i - 1], b = trail[i];
     const k = i / trail.length;
-    p.line(a.x, a.y, b.x, b.y, 2 + k * 10, COL.trail, k * 0.6);
+    p.line(a.x, a.y, b.x, b.y, 2 + k * 10, color, k * 0.6);
   }
 }
 

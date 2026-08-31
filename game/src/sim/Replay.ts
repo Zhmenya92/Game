@@ -1,6 +1,7 @@
 import { Simulation } from './Simulation.ts';
 import { InputTrace } from './InputTrace.ts';
 import type { Segment } from './types.ts';
+import { stepTrace } from './playback.ts';
 
 /**
  * Реплей: відтворення рану з сіду й треку вводу.
@@ -31,11 +32,15 @@ export class ReplayTrack {
   }
 
   get alive(): boolean { return this.sim.state.alive; }
-  get done(): boolean { return this.frame >= this.attempt.frames || !this.sim.state.alive; }
+  get done(): boolean {
+    if (this.frame >= this.attempt.frames) return true;
+    // Мертвий, але з воскресінням на цьому кадрі, — ще не готовий.
+    return !this.sim.state.alive && !this.attempt.trace.isReviveAt(this.frame);
+  }
 
   step(): void {
     if (this.done) return;
-    this.sim.step(this.attempt.trace.isDownAt(this.frame));
+    stepTrace(this.sim, this.attempt.trace, this.frame);
     this.frame++;
   }
 }

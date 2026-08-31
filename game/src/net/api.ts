@@ -52,7 +52,10 @@ export const api = {
     return call('/api/daily');
   },
 
-  async session(): Promise<{ ok: boolean; userId: number; chatId: string } | null> {
+  async session(): Promise<{
+    ok: boolean; userId: number; chatId: string;
+    streak: number; revives: number; skin: string | null; skins: string[];
+  } | null> {
     return call('/api/session', { initData: telegram.initData() });
   },
 
@@ -88,7 +91,50 @@ export const api = {
     return r?.ok ? r : null;
   },
 
-  async event(name: string): Promise<void> {
-    void call('/api/event', { name });
+  /** Каталог, баланс продовжень і куплені скіни. */
+  async shop(): Promise<{
+    ok: boolean;
+    products: { id: string; kind: string; title: string; description: string; stars: number; revives: number }[];
+    revives: number; skins: string[]; skin: string | null;
+    starsAvailable: boolean; devGrant?: boolean;
+  } | null> {
+    return call('/api/shop', { initData: telegram.initData() });
+  },
+
+  /** Посилання на інвойс Stars. Без токена бота сервер віддає dev-видачу. */
+  async invoice(productId: string): Promise<{
+    ok: boolean; link?: string; dev?: boolean; granted?: boolean;
+    revives?: number; note?: string; reason?: string;
+  } | null> {
+    return call('/api/iap/invoice', { initData: telegram.initData(), productId });
+  },
+
+  /**
+   * Заявити перегляд реклами. Працює ЛИШЕ в режимі розробки: у продакшні
+   * нараховує тільки серверний колбек Adsgram, і сервер тут відповість 403.
+   */
+  async adClaim(rid: string): Promise<{ ok: boolean; revives?: number } | null> {
+    return call('/api/ad/claim', { initData: telegram.initData(), rid });
+  },
+
+  /**
+   * Оплатити одне воскресіння. Клієнт воскресає ЛИШЕ після ok від сервера:
+   * інакше продовження, за яке не заплачено, потрапить у трек, і сервер
+   * відхилить увесь ран.
+   */
+  async reserveRevive(): Promise<{ ok: boolean; revives?: number; reason?: string } | null> {
+    return call('/api/revive', { initData: telegram.initData() });
+  },
+
+  async setSkin(skinId: string): Promise<{ ok: boolean } | null> {
+    return call('/api/skin', { initData: telegram.initData(), skinId });
+  },
+
+  /**
+   * Подія аналітики. З тиждня 6 подія без сесії не приймається — інакше
+   * чисельник гейта 3 накручується звичайним curl (дефект 50).
+   */
+  async event(name: string, props?: Record<string, string | number | boolean>): Promise<void> {
+    void call('/api/event', { initData: telegram.initData(), name, props });
   },
 };

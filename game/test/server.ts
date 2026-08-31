@@ -235,8 +235,12 @@ await (async () => {
   });
   ok('невідомий id у павутині відхиляється', unknownWeb.status === 400);
 
-  const ev = await post('/api/event', { name: 'run_end' });
-  ok('POST /api/event приймає подію', ev.status === 200);
+  // З тижня 6 подія без сесії не приймається (дефект 50): відкритий
+  // ендпоінт дозволяв накрутити чисельник гейта 3 звичайним curl.
+  const evAnon = await post('/api/event', { name: 'run_end' });
+  ok('POST /api/event без сесії відхиляє', evAnon.status === 401);
+  const ev = await post('/api/event', { initData: 'dev:1001:chatA', name: 'run_end' });
+  ok('POST /api/event із сесією приймає подію', ev.status === 200);
 
   const nf = await fetch(base + '/api/немає');
   ok('невідомий шлях дає 404', nf.status === 404);
