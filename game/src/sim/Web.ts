@@ -2,6 +2,8 @@ import { BALANCE } from '../config/balance.ts';
 import { InputTrace } from './InputTrace.ts';
 import { Simulation } from './Simulation.ts';
 import type { Segment } from './types.ts';
+import type { Difficulty } from './Simulation.ts';
+import { playTrace } from './playback.ts';
 
 /**
  * Павутина (бриф, розділ 4 і prototype-1-pavutyna.md, розділ 4).
@@ -18,7 +20,12 @@ import type { Segment } from './types.ts';
  */
 export function buildFromTraces(
   seed: number,
-  traces: readonly { ownerId: number; trace: InputTrace; day: number }[],
+  traces: readonly {
+    ownerId: number; trace: InputTrace; day: number;
+    /** Складність, з якою грався ТОЙ ран. Без неї відрізки розійдуться
+     *  з тим, що бачив автор рану, і верифікація почне відхиляти чесних. */
+    difficulty?: Difficulty;
+  }[],
 ): Segment[] {
   const out: Segment[] = [];
 
@@ -26,13 +33,13 @@ export function buildFromTraces(
   const ordered = traces.slice().sort((a, b) => a.ownerId - b.ownerId);
 
   for (const t of ordered) {
-    const sim = new Simulation(seed, []);
+    const sim = new Simulation(seed, [], undefined, t.difficulty ?? 'normal');
     const lastFrame = t.trace.events.length
       ? t.trace.events[t.trace.events.length - 1].frame + 1
       : 0;
-    for (let f = 0; f <= lastFrame && sim.state.alive; f++) {
-      sim.step(t.trace.isDownAt(f));
-    }
+    // Через playTrace, а не власним циклом: інакше воскресіння в чужому
+    // треку обірве розбір на першій смерті й павутина вийде коротшою.
+    playTrace(sim, t.trace, lastFrame + 1);
     for (let i = 0; i < sim.ownWeb.length; i++) {
       const s = sim.ownWeb[i];
       out.push({

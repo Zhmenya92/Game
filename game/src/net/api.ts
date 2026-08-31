@@ -68,6 +68,8 @@ export const api = {
   async submit(run: {
     seed: number; traceB64: string; score: number; frames: number;
     webRunIds: string[]; challengeToken?: string | null;
+    /** Складність рану. Сервер переграє саме з нею. */
+    difficulty?: 'normal' | 'calm';
   }): Promise<{
     ok: boolean; reason?: string; id?: string;
     foreignHooks?: number;

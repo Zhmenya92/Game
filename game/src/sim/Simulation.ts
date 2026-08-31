@@ -42,9 +42,15 @@ export type SimResult = {
  * обнуляється. Тільки +, −, ×, ÷ і sqrt, тобто операції, точно задані
  * IEEE 754 і однакові в будь-якому JS-рушії. Див. MathDet.ts.
  */
+/** Рівень складності. Впливає лише на швидкість стіни. */
+export type Difficulty = keyof typeof BALANCE.difficulty;
+
 export class Simulation {
   readonly track: Track;
   readonly state: SimState;
+  /** Складність цього рану. Незмінна: міняти її посеред рану означало б
+   *  зробити трек невідтворюваним. */
+  readonly difficulty: Difficulty;
 
   /** Чужа павутина — вхід симуляції, не змінюється під час рану. */
   private foreignWeb: Segment[];
@@ -57,8 +63,14 @@ export class Simulation {
   private releaseIndex = 0;
   private result_: SimResult | null = null;
 
-  constructor(seed: number, foreignWeb: readonly Segment[] = [], track?: Track) {
+  constructor(
+    seed: number,
+    foreignWeb: readonly Segment[] = [],
+    track?: Track,
+    difficulty: Difficulty = 'normal',
+  ) {
     this.track = track ?? makeTrack(seed);
+    this.difficulty = difficulty;
     this.foreignWeb = foreignWeb.slice();
     this.state = {
       frame: 0,
@@ -169,7 +181,7 @@ export class Simulation {
     const chaseScale = Math.min(
       BALANCE.chaseScaleMax,
       BALANCE.chaseSpeedScale + s.frame * BALANCE.dt * BALANCE.chaseAccelPerSec,
-    );
+    ) * BALANCE.difficulty[this.difficulty].chaseFactor;
     s.killX += this.baseSpeedNow() * chaseScale * dt;
     s.frame += 1;
     const score = Math.floor(s.px / 10);
@@ -229,6 +241,7 @@ export class Simulation {
   clone(): Simulation {
     const c = Object.create(Simulation.prototype) as Simulation;
     (c as any).track = this.track;
+    (c as any).difficulty = this.difficulty;
     (c as any).state = { ...this.state };
     (c as any).foreignWeb = this.foreignWeb;
     (c as any).ownWeb = this.ownWeb.map(s => ({ ...s }));

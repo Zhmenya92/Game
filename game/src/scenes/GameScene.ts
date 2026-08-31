@@ -11,6 +11,10 @@ import { telegram } from '../net/telegram.ts';
 import type { Segment } from '../sim/types.ts';
 import { COL, skinHero, skinTrail } from '../config/palette.ts';
 import { ads } from '../net/ads.ts';
+import {
+  loadSettings, saveSettings, loadLearned, saveLearned,
+  type Settings, type Learned,
+} from '../config/settings.ts';
 import { SpritePool } from '../render/SpritePool.ts';
 import * as S from '../render/scene.ts';
 import type { View } from '../render/scene.ts';
@@ -43,7 +47,7 @@ const VIEW_H = BALANCE.bandHeight / ZOOM;
  * Окремий стан, бо звичайна смерть мусить лишатися МИТТЄВОЮ: гейт 1 вимагає
  * рестарту менше ніж за 400 мс, і пропозиція на кожну смерть його вбила б.
  */
-type Mode = 'play' | 'dead' | 'offer' | 'swarm';
+type Mode = 'play' | 'dead' | 'offer' | 'swarm' | 'settings';
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; c: number };
 
 export class GameScene extends Phaser.Scene {
@@ -90,6 +94,14 @@ export class GameScene extends Phaser.Scene {
   /** Найкращий чужий рахунок на цьому сіді — для події ghost_beaten. */
   private rivalBest = 0;
   private beatenSent = false;
+  /** Налаштування й що гравець уже вміє — обидва переживають перезапуск. */
+  private settings: Settings = loadSettings();
+  private learned: Learned = loadLearned();
+  /** Чи чіплявся гравець у ЦЬОМУ рані — від цього залежить банер виклику. */
+  private attachedThisRun = false;
+  private modeBeforeSettings: Mode = 'play';
+  private btnGear!: Phaser.GameObjects.Text;
+  private settingsRows: Phaser.GameObjects.Text[] = [];
   private starsAvailable = false;
   private devGrant = false;
   private btnContinue!: Phaser.GameObjects.Text;
@@ -180,6 +192,29 @@ export class GameScene extends Phaser.Scene {
       void this.earnContinue();
     });
 
+    // Шестерня. Маленька, у кутку, і не заважає тапу по грі: у неї власний
+    // обробник із зупинкою поширення події.
+    this.btnGear = this.add.text(w - 28, 28, '⚙', {
+      fontFamily: 'ui-monospace, monospace', fontSize: '44px', color: '#8fa8a4',
+      padding: { x: 14, y: 10 },
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(26).setInteractive();
+    this.btnGear.on('pointerdown', (_p: unknown, _x: number, _y: number, e: { stopPropagation: () => void }) => {
+      e?.stopPropagation?.();
+      this.toggleSettings();
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const t = this.add.text(w / 2, h * 0.3 + i * 96, '', {
+        fontFamily: 'ui-monospace, monospace', fontSize: '36px', color: '#e6edeb',
+        backgroundColor: '#131a19', padding: { x: 26, y: 16 }, align: 'center',
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(41).setVisible(false).setInteractive();
+      t.on('pointerdown', (_p: unknown, _x: number, _y: number, e: { stopPropagation: () => void }) => {
+        e?.stopPropagation?.();
+        this.onSettingsRow(i);
+      });
+      this.settingsRows.push(t);
+    }
+
     const down = () => { this.onPress(); };
     const up = () => { this.pointerDown = false; };
     this.input.on('pointerdown', down);
@@ -199,6 +234,7 @@ ${this.atlasError || 'немає текстури atlas'}
       return;
     }
 
+    this.applyTextSize();
     this.cameras.main.setZoom(ZOOM);
     telegram.init();
     this.restart(1);
@@ -317,6 +353,9 @@ ${this.atlasError || 'немає текстури atlas'}
 
   /** Натискання означає різне залежно від стану. */
   private onPress(): void {
+    // Тап повз рядки налаштувань закриває панель. Меню не має ставати
+    // пасткою, з якої не видно виходу.
+    if (this.mode === 'settings') { this.toggleSettings(); return; }
     if (this.mode === 'swarm') { this.endSwarm(); return; }
     // Тап повз кнопки = «ні, дякую». Пропозиція не має ставати перешкодою.
     if (this.mode === 'offer') { this.declineOffer(); return; }
@@ -347,7 +386,7 @@ ${this.atlasError || 'немає текстури atlas'}
       this.day++;
     }
     this.seed = seed;
-    this.sim = new Simulation(seed, this.foreignWeb);
+    this.sim = new Simulation(seed, this.foreignWeb, undefined, this.settings.difficulty);
     this.trace = new InputTrace();
     this.mode = 'play';
     this.accumulator = 0;
@@ -356,6 +395,7 @@ ${this.atlasError || 'немає текстури atlas'}
     this.particles.length = 0;
     this.runStartedAt = this.time.now;
     this.beatenSent = false;
+    this.attachedThisRun = false;
     this.bakeWeb();
     if (this.online) void api.event('run_start', { seed, attempt: this.attempts.length + 1 });
   }
@@ -374,6 +414,7 @@ ${this.atlasError || 'немає текстури atlas'}
   }
 
   private buzz(kind: 'light' | 'heavy' | 'fail'): void {
+    if (!this.settings.haptics) return;
     telegram.haptic(kind);
   }
 
@@ -421,7 +462,8 @@ ${this.atlasError || 'немає текстури atlas'}
   private finishRun(): void {
     const s = this.sim.state;
     this.attempts.push({
-      trace: this.trace, frames: s.frame, score: s.score, index: this.attempts.length + 1,
+      trace: this.trace, frames: s.frame, score: s.score,
+      index: this.attempts.length + 1, difficulty: this.sim.difficulty,
     });
     if (this.attempts.length > 60) this.attempts.shift();
     void this.submit(s.score, s.frame);
@@ -434,6 +476,64 @@ ${this.atlasError || 'немає текстури atlas'}
     } else if (s.score > this.best) {
       this.best = s.score;
     }
+  }
+
+  // ── Налаштування (testing-plan.md, розділ 6.3–6.4) ────────────────────
+
+  private toggleSettings(): void {
+    if (this.mode === 'settings') {
+      this.mode = this.modeBeforeSettings;
+      this.accumulator = 0;               // без цього після паузи буде ривок
+      for (const r of this.settingsRows) r.setVisible(false);
+      return;
+    }
+    if (this.mode === 'offer' || this.mode === 'swarm') return;
+    this.modeBeforeSettings = this.mode;
+    this.mode = 'settings';
+    this.pointerDown = false;
+    this.refreshSettings();
+  }
+
+  private refreshSettings(): void {
+    const st = this.settings;
+    const labels = [
+      `Складність: ${st.difficulty === 'calm' ? 'спокійна' : 'звичайна'}`,
+      `Чужі лінії: ${st.colorSafe ? 'без кольору' : 'кольорові'}`,
+      `Крупний текст: ${st.bigText ? 'так' : 'ні'}`,
+      `Вібрація: ${st.haptics ? 'увімкнена' : 'вимкнена'}`,
+      'Закрити',
+    ];
+    for (let i = 0; i < this.settingsRows.length; i++) {
+      this.settingsRows[i].setText(labels[i]).setVisible(true);
+    }
+  }
+
+  private onSettingsRow(i: number): void {
+    const st = this.settings;
+    if (i === 0) {
+      // Складність входить у симуляцію, тому міняти її посеред рану не
+      // можна: трек перестав би відтворюватись. Ран починається наново.
+      st.difficulty = st.difficulty === 'calm' ? 'normal' : 'calm';
+      saveSettings(st);
+      this.refreshSettings();
+      this.toggleSettings();
+      this.restart(this.seed);
+      return;
+    }
+    if (i === 1) st.colorSafe = !st.colorSafe;
+    if (i === 2) { st.bigText = !st.bigText; this.applyTextSize(); }
+    if (i === 3) st.haptics = !st.haptics;
+    if (i === 4) { saveSettings(st); this.toggleSettings(); return; }
+    saveSettings(st);
+    if (i === 1) this.bakeWeb();
+    this.refreshSettings();
+  }
+
+  private applyTextSize(): void {
+    const k = this.settings.bigText ? 1.35 : 1;
+    this.txtScore.setFontSize(Math.round(96 * k));
+    this.txtSub.setFontSize(Math.round(30 * k));
+    this.txtHint.setFontSize(Math.round(40 * k));
   }
 
   // ── Продовження (plan.md, 10.2) ───────────────────────────────────────
@@ -571,6 +671,7 @@ ${this.atlasError || 'немає текстури atlas'}
       traceB64: btoa(bin),
       score, frames,
       webRunIds: this.remoteRuns.map(x => x.id),
+      difficulty: this.sim.difficulty,
       challengeToken: this.incomingToken,
     });
     if (r && r.ok === false) this.netNote = `сервер відхилив: ${r.reason ?? '?'}`;
@@ -604,6 +705,13 @@ ${this.atlasError || 'немає текстури atlas'}
     if (this.broken) return;          // симуляції не існує — крутити нічого
     const now = this.time.now;
 
+    if (this.mode === 'settings') {
+      // Симуляція стоїть. Кадр усе одно малюється — інакше екран замерз би
+      // на попередньому кадрі й виглядав би як зависання.
+      this.draw();
+      return;
+    }
+
     if (this.mode === 'swarm') {
       this.stepSwarm();
       this.drawSwarm();
@@ -621,7 +729,16 @@ ${this.atlasError || 'немає текстури atlas'}
         }
         const wasAttached = s.attached;
         this.sim.step(this.pointerDown);
+        if (wasAttached && !s.attached && !this.learned.released) {
+          this.learned.released = true;
+          saveLearned(this.learned);
+        }
         if (!wasAttached && s.attached) {          // щойно зачепився
+          this.attachedThisRun = true;
+          if (!this.learned.attached) {
+            this.learned.attached = true;
+            saveLearned(this.learned);
+          }
           this.flash = Math.max(this.flash, 0.18);
           this.burst(s.ax, s.ay, 7, COL.anchorLive, 190);
           this.buzz('light');
@@ -682,7 +799,7 @@ ${this.atlasError || 'немає текстури atlas'}
   /** Чужа павутина за рану не змінюється — розкладається раз на рестарті. */
   private bakeWeb(): void {
     this.webPool.begin();
-    S.drawForeignWeb(this.webPool, this.foreignWeb);
+    S.drawForeignWeb(this.webPool, this.foreignWeb, this.settings.colorSafe);
     this.webPool.end();
   }
 
@@ -718,13 +835,19 @@ ${this.atlasError || 'немає текстури atlas'}
     }
     this.txtScore.setText(String(s.score));
     this.txtSub.setText(`рекорд ${this.best}   спроба ${this.attempts.length + 1}   ліній ${this.sim.ownWeb.length + this.foreignWeb.length}` + (this.netNote ? `   ${this.netNote}` : ''));
+    // Підказки зникають ЗА ДІЄЮ, а не за таймером. Раніше вони гасли через
+    // 150 кадрів незалежно від того, чи встиг хтось прочитати, — це прямо
+    // порушує базовий рівень Game Accessibility Guidelines, який вимагає
+    // темпу читання за гравцем.
     this.txtHint.setText(
-      this.mode === 'offer'
+      this.mode === 'settings' ? 'НАЛАШТУВАННЯ'
+      : this.mode === 'offer'
         ? `ЩЕ РАЗ ІЗ ЦЬОГО МІСЦЯ?\nрахунок ${s.score} лишається${this.offerNote ? '\n' + this.offerNote : ''}`
       : this.mode === 'dead' ? ''
-      : s.frame < 150 && this.incomingToken
+      : this.incomingToken && !this.attachedThisRun
         ? `ТЕБЕ ВИКЛИКАЛИ\nйого рахунок ${this.challengerScore}\nта сама траса`
-      : s.frame < 150 && !s.attached ? 'ТРИМАЙ — чіпляєшся\nВІДПУСТИ — летиш'
+      : !this.learned.attached ? 'ТРИМАЙ — чіпляєшся'
+      : !this.learned.released ? 'ВІДПУСТИ — летиш'
       : '',
     );
   }

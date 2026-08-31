@@ -199,6 +199,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         ok: true,
         runs: others.map(r => ({
           id: r.id, ownerId: r.ownerId, traceB64: r.traceB64, score: r.score, day: r.day,
+          difficulty: r.difficulty ?? 'normal',
         })),
       });
       return;
@@ -215,6 +216,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         score: Number(b.score),
         frames: Number(b.frames),
         webRunIds: Array.isArray(b.webRunIds) ? (b.webRunIds as unknown[]).map(String) : [],
+        difficulty: b.difficulty === 'calm' ? 'calm' : 'normal',
       };
       const webRuns = store.byIds(s.chatId, run.seed, run.webRunIds);
       if (webRuns.length !== run.webRunIds.length) {
@@ -238,7 +240,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       const stored = store.add(s.chatId, {
         ownerId: s.userId, seed: run.seed, traceB64: run.traceB64,
         score: v.score, frames: v.frames, day: dayNumber(),
-        foreignHooks: v.foreignHooks,
+        foreignHooks: v.foreignHooks, difficulty: run.difficulty,
       });
 
       // Якщо ран зіграно за викликом — це відповідь. Без цього зв'язку
@@ -264,6 +266,12 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       const runId = String(b.runId ?? '');
       const mine = store.list(s.chatId, seed).find(r => r.id === runId && r.ownerId === s.userId);
       if (!mine) { json(res, 400, { ok: false, reason: 'немає такого власного рану' }); return; }
+      // Виклик на спокійній складності був би нечесним порівнянням: у того,
+      // хто кинув, стіна їхала повільніше. Ран лишається, викликом не стає.
+      if (mine.difficulty === 'calm') {
+        json(res, 400, { ok: false, reason: 'на спокійній складності виклик не кидається' });
+        return;
+      }
       const c = challenges.create(s.chatId, s.userId, seed, runId, mine.score);
       json(res, 200, {
         ok: true,

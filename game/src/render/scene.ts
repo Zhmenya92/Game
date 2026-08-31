@@ -77,11 +77,33 @@ export function drawBackground(p: Painter, view: View, killX: number, frame: num
   }
 }
 
-/** Чужа павутина. За рану не змінюється, тому в грі розкладається один раз. */
-export function drawForeignWeb(p: Painter, web: readonly Segment[]): void {
+/**
+ * Чужа павутина. За рану не змінюється, тому в грі розкладається один раз.
+ *
+ * ЧУЖА ЛІНІЯ — ПУНКТИРНА, власна — суцільна. Це не косметика: до цієї
+ * правки єдиною відмінністю був колір, бірюзовий проти помаранчевого, а
+ * саме цю пару плутають при дейтеранопії. Базовий рівень
+ * Game Accessibility Guidelines прямо забороняє передавати інформацію
+ * лише кольором, а тут кольором передавалася головна механіка концепту.
+ *
+ * `colorSafe` додатково знебарвлює чужі лінії до світлого, щоб не спиратися
+ * на відтінок узагалі.
+ */
+export function drawForeignWeb(p: Painter, web: readonly Segment[], colorSafe = false): void {
+  const color = colorSafe ? 0xdce8e6 : COL.foreignWeb;
   for (const s of web) {
-    p.line(s.ax, s.ay, s.bx, s.by, BALANCE.lineVisualWidth + 5, COL.foreignWeb, 0.16);
-    p.line(s.ax, s.ay, s.bx, s.by, BALANCE.lineVisualWidth, COL.foreignWeb, 0.55);
+    const dx = s.bx - s.ax, dy = s.by - s.ay;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    // Штрих ~26 одиниць із проміжком: на коротких відрізках лишається
+    // щонайменше три штрихи, інакше пунктир не читається як пунктир.
+    const n = Math.max(3, Math.round(len / 26));
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 0.62) / n;
+      const ax = s.ax + dx * t0, ay = s.ay + dy * t0;
+      const bx = s.ax + dx * t1, by = s.ay + dy * t1;
+      p.line(ax, ay, bx, by, BALANCE.lineVisualWidth + 5, color, 0.14);
+      p.line(ax, ay, bx, by, BALANCE.lineVisualWidth, color, 0.62);
+    }
   }
 }
 
@@ -103,10 +125,11 @@ export function drawAnchors(p: Painter, anchors: readonly Anchor[],
   }
 }
 
+/** Власна павутина — СУЦІЛЬНА і трохи товща за чужу. Форма, а не колір. */
 export function drawOwnWeb(p: Painter, web: readonly Segment[]): void {
   for (const w of web) {
-    p.line(w.ax, w.ay, w.bx, w.by, BALANCE.lineVisualWidth + 6, COL.ownWeb, 0.14);
-    p.line(w.ax, w.ay, w.bx, w.by, BALANCE.lineVisualWidth, COL.ownWeb, 0.85);
+    p.line(w.ax, w.ay, w.bx, w.by, BALANCE.lineVisualWidth + 7, COL.ownWeb, 0.14);
+    p.line(w.ax, w.ay, w.bx, w.by, BALANCE.lineVisualWidth + 1.5, COL.ownWeb, 0.85);
   }
 }
 

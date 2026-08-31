@@ -1,4 +1,4 @@
-import { Simulation } from './Simulation.ts';
+import { Simulation, type Difficulty } from './Simulation.ts';
 import { InputTrace } from './InputTrace.ts';
 import type { Segment } from './types.ts';
 import { stepTrace } from './playback.ts';
@@ -18,6 +18,8 @@ export type Attempt = {
   score: number;
   /** Порядковий номер спроби на цьому сіді, з 1. */
   index: number;
+  /** Складність тієї спроби — щоб рій відтворював її, а не поточну. */
+  difficulty?: Difficulty;
 };
 
 /** Одна доріжка рою — симуляція, що програє збережений трек. */
@@ -27,7 +29,7 @@ export class ReplayTrack {
   private frame = 0;
 
   constructor(seed: number, attempt: Attempt, foreignWeb: readonly Segment[] = []) {
-    this.sim = new Simulation(seed, foreignWeb);
+    this.sim = new Simulation(seed, foreignWeb, undefined, attempt.difficulty ?? 'normal');
     this.attempt = attempt;
   }
 

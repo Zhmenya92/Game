@@ -5,6 +5,7 @@ import { selectVisible } from '../src/sim/Web.ts';
 import { BALANCE } from '../src/config/balance.ts';
 import { playTrace } from '../src/sim/playback.ts';
 import type { Segment } from '../src/sim/types.ts';
+import type { Difficulty } from '../src/sim/Simulation.ts';
 
 /**
  * Серверна верифікація рахунку переграванням (plan.md, 8.1).
@@ -22,6 +23,9 @@ export type SubmittedRun = {
   frames: number;
   /** Ідентифікатори чужих ранів, з яких клієнт будував павутину. */
   webRunIds: string[];
+  /** Складність рану. Сервер переграє САМЕ з нею — інакше чесний ран на
+   *  спокійній складності буде відхилено як накрутка. */
+  difficulty?: Difficulty;
 };
 
 export type StoredRun = {
@@ -34,6 +38,7 @@ export type StoredRun = {
   score: number;
   frames: number;
   day: number;
+  difficulty?: Difficulty;
 };
 
 export type VerifyResult =
@@ -79,7 +84,7 @@ export function verifyRun(
     return { ok: false, reason: `воскресінь у треку ${trace.reviveCount}, стеля ${BALANCE.reviveMaxPerRun}` };
   }
 
-  const sim = new Simulation(run.seed, web);
+  const sim = new Simulation(run.seed, web, undefined, run.difficulty ?? 'normal');
   const limit = Math.min(run.frames + 2, MAX_FRAMES);
   playTrace(sim, trace, limit);
 
@@ -114,6 +119,7 @@ export function buildWeb(seed: number, runs: readonly StoredRun[]): Segment[] {
       ownerId: r.ownerId,
       trace: InputTrace.deserialize(Buffer.from(r.traceB64, 'base64')),
       day: r.day,
+      difficulty: r.difficulty ?? 'normal',
     }));
   return selectVisible(buildFromTraces(seed, traces), BALANCE.foreignLineLimit);
 }
