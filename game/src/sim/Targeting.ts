@@ -14,7 +14,7 @@ import type { Anchor, Segment, Target } from './types.ts';
  * Пріоритет (4.4): виграє найменша effectiveDist, де для анкера вона × 0.8.
  */
 
-const ANCHOR_PREFERENCE = 0.8;
+
 
 /**
  * Чи придатний напрямок до цілі.
@@ -52,7 +52,7 @@ export function selectTarget(
     const d = len(dx, dy);
     if (d < BALANCE.ropeMin || d > BALANCE.ropeMax) continue;
     if (!isValidDirection(dx, dy, d)) continue;
-    const eff = d * ANCHOR_PREFERENCE;
+    const eff = d * BALANCE.anchorPreference;
     if (eff < bestEffective) {
       bestEffective = eff;
       best = { kind: 'anchor', x: a.x, y: a.y, dist: d };

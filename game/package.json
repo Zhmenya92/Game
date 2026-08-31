@@ -8,13 +8,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8788",
-    "test": "node test/determinism.ts && node test/replay.ts && node test/fairness.ts",
+    "test": "node test/determinism.ts && node test/replay.ts && node test/server.ts && node test/fairness.ts",
     "test:determinism": "node test/determinism.ts",
     "test:fairness": "node test/fairness.ts",
     "sweep": "node tools/sweep3.ts",
     "trace": "node tools/trace.ts",
     "test:replay": "node test/replay.ts",
-    "test:human": "node test/humanPlayer.ts"
+    "test:human": "node test/humanPlayer.ts",
+    "server": "node server/index.ts",
+    "test:server": "node test/server.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

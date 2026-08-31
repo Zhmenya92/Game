@@ -20,6 +20,10 @@ export type SimState = {
   score: number;
   /** Ліва межа смерті, що їде за гравцем. */
   killX: number;
+  /** Скільки разів гравець зачепився за ЧУЖУ лінію — головна метрика К4. */
+  foreignHooks: number;
+  /** Скільки разів за будь-яку лінію павутини. */
+  webHooks: number;
 };
 
 export type SimResult = {
@@ -67,6 +71,8 @@ export class Simulation {
       alive: true,
       score: 0,
       killX: BALANCE.startX - BALANCE.chaseHeadStart,
+      foreignHooks: 0,
+      webHooks: 0,
     };
   }
 
@@ -91,7 +97,11 @@ export class Simulation {
     s.attachedToAnchor = t.kind === 'anchor';
     this.currentTarget = t;
     this.bufferUntilFrame = -1;
-    if (t.kind === 'segment') t.segment.hooks += 1;
+    if (t.kind === 'segment') {
+      t.segment.hooks += 1;
+      s.webHooks += 1;
+      if (t.segment.ownerId !== 0) s.foreignHooks += 1;
+    }
   }
 
   private release(): void {
@@ -110,7 +120,8 @@ export class Simulation {
     }
     // Поштовх на зриві (дефект 29): компенсує втрату висоти за замах.
     const sp = len(s.vx, s.vy);
-    const boosted = sp * BALANCE.releaseBoost;
+    const boost = s.attachedToAnchor ? BALANCE.releaseBoost : BALANCE.releaseBoostLine;
+    const boosted = sp * boost;
     const capped = boosted > BALANCE.maxSpeed ? BALANCE.maxSpeed : boosted;
     if (sp > 0) { const k = capped / sp; s.vx *= k; s.vy *= k; }
     s.attached = false;

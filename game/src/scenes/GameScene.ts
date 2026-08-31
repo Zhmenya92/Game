@@ -5,6 +5,9 @@ import { InputTrace } from '../sim/InputTrace.ts';
 import { selectVisible } from '../sim/Web.ts';
 import { selectTarget } from '../sim/Targeting.ts';
 import { buildSwarm, type Attempt, type ReplayTrack } from '../sim/Replay.ts';
+import { buildFromTraces } from '../sim/Web.ts';
+import { api, type RemoteRun } from '../net/api.ts';
+import { telegram } from '../net/telegram.ts';
 import type { Segment } from '../sim/types.ts';
 
 /**
@@ -59,6 +62,11 @@ export class GameScene extends Phaser.Scene {
   private swarm: ReplayTrack[] = [];
   private swarmFrame = 0;
 
+  /** Мережа: чужі рани цього чату на цьому сіді. */
+  private remoteRuns: RemoteRun[] = [];
+  private online = false;
+  private netNote = '';
+
   private gSky!: Phaser.GameObjects.Graphics;
   private gWeb!: Phaser.GameObjects.Graphics;
   private gWorld!: Phaser.GameObjects.Graphics;
@@ -103,7 +111,48 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-R', () => this.newSeed());
 
     this.cameras.main.setZoom(0.78);
+    telegram.init();
     this.restart(1);
+    void this.connect();
+  }
+
+  /**
+   * Підключення до бекенду. Гра вже йде — мережа лише додає чужі лінії.
+   * Жоден збій тут не має ламати гру, тому все через м'які фолбеки.
+   */
+  private async connect(): Promise<void> {
+    const ses = await api.session();
+    this.online = !!ses?.ok;
+    if (!this.online) { this.netNote = 'офлайн'; return; }
+    const d = await api.daily();
+    const seed = d?.seed ?? this.seed;
+    this.netNote = telegram.inside ? `Telegram ${telegram.version}` : 'браузер';
+    await this.loadSeed(seed);
+  }
+
+  /** Забрати чужі рани для сіду й перебудувати павутину. */
+  private async loadSeed(seed: number): Promise<void> {
+    this.remoteRuns = await api.runs(seed);
+    this.attempts = [];
+    this.best = 0;
+    this.seed = seed;
+    this.rebuildForeignWeb();
+    this.restart(seed);
+  }
+
+  /** Павутина з чужих ранів. Той самий код, що й на сервері, — інакше
+   *  верифікація відхилятиме чесні рани. */
+  private rebuildForeignWeb(): void {
+    if (!this.remoteRuns.length) return;
+    const traces = this.remoteRuns
+      .slice()
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .map(r => ({
+        ownerId: r.ownerId,
+        trace: InputTrace.deserialize(Uint8Array.from(atob(r.traceB64), c => c.charCodeAt(0))),
+        day: r.day,
+      }));
+    this.foreignWeb = selectVisible(buildFromTraces(this.seed, traces), BALANCE.foreignLineLimit);
   }
 
   /** Натискання означає різне залежно від стану. */
@@ -123,7 +172,7 @@ export class GameScene extends Phaser.Scene {
   private restart(seed: number): void {
     // Павутина минулого рану стає «чужою»: так у тижні 1 перевіряється ідея К4
     // без бекенду — чужі лінії симулюються власним попереднім раном.
-    if (this.sim && this.sim.ownWeb.length && seed === this.seed) {
+    if (!this.online && this.sim && this.sim.ownWeb.length && seed === this.seed) {
       this.foreignWeb = selectVisible(
         this.foreignWeb.concat(this.sim.ownWeb.map(s => ({ ...s, ownerId: 1, bornDay: this.day }))),
         BALANCE.foreignLineLimit,
@@ -163,9 +212,8 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private buzz(ms: number): void {
-    const nav = navigator as Navigator & { vibrate?: (p: number) => boolean };
-    if (typeof nav.vibrate === 'function') nav.vibrate(ms);
+  private buzz(kind: 'light' | 'heavy' | 'fail'): void {
+    telegram.haptic(kind);
   }
 
   private onDeath(): void {
@@ -176,12 +224,13 @@ export class GameScene extends Phaser.Scene {
     this.flash = 0.55;
     this.cameras.main.shake(180, 0.014);
     this.burst(s.px, s.py, 22, COL.chase, 520);
-    this.buzz(35);
+    this.buzz('fail');
 
     this.attempts.push({
       trace: this.trace, frames: s.frame, score: s.score, index: this.attempts.length + 1,
     });
     if (this.attempts.length > 60) this.attempts.shift();
+    void this.submit(s.score, s.frame);
 
     // Рій показуємо на рекорді — саме тоді він і є історією: «ось усі рази,
     // коли я ламався, і ось цей». В інших випадках рестарт миттєвий.
@@ -191,6 +240,22 @@ export class GameScene extends Phaser.Scene {
     } else if (s.score > this.best) {
       this.best = s.score;
     }
+  }
+
+  /** Рахунок перевіряє сервер, переграючи трек. Клієнту не вірять. */
+  private async submit(score: number, frames: number): Promise<void> {
+    if (!this.online) return;
+    const bytes = this.trace.serialize();
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    const r = await api.submit({
+      seed: this.seed,
+      traceB64: btoa(bin),
+      score, frames,
+      webRunIds: this.remoteRuns.map(x => x.id),
+    });
+    if (r && r.ok === false) this.netNote = `сервер відхилив: ${r.reason ?? '?'}`;
+    void api.event('run_end');
   }
 
   private startSwarm(): void {
@@ -228,7 +293,7 @@ export class GameScene extends Phaser.Scene {
         if (!wasAttached && s.attached) {          // щойно зачепився
           this.flash = Math.max(this.flash, 0.18);
           this.burst(s.ax, s.ay, 7, COL.anchorLive, 190);
-          this.buzz(12);
+          this.buzz('light');
         }
         this.accumulator -= BALANCE.dt;
         steps++;
@@ -379,7 +444,7 @@ export class GameScene extends Phaser.Scene {
 
     if (s.score > this.best && this.mode === 'play') this.best = s.score;
     this.txtScore.setText(String(s.score));
-    this.txtSub.setText(`рекорд ${this.best}    спроба ${this.attempts.length + 1}    ліній ${this.sim.ownWeb.length + this.foreignWeb.length}`);
+    this.txtSub.setText(`рекорд ${this.best}   спроба ${this.attempts.length + 1}   ліній ${this.sim.ownWeb.length + this.foreignWeb.length}` + (this.netNote ? `   ${this.netNote}` : ''));
     this.txtHint.setText(
       this.mode === 'dead' ? ''
       : s.frame < 150 && !s.attached ? 'ТРИМАЙ — чіпляєшся\nВІДПУСТИ — летиш'
