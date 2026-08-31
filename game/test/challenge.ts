@@ -165,14 +165,14 @@ await (async () => {
     rOther.s === 200 && rOther.j.ok === true && rOther.j.repliedTo === null,
     JSON.stringify(rOther.j).slice(0, 120));
 
-  const mid = await (await fetch(B + '/api/metrics')).json() as Record<string, any>;
+  const mid = ((await (await fetch(B + '/api/metrics')).json()) as Record<string, any>).gate3;
   ok('після чужої траси відповідь усе ще одна', mid.challengeReplies === 1,
     String(mid.challengeReplies));
 
   for (let i = 0; i < 3; i++) await post('/api/event', { initData: A, name: 'run_end' });
   await post('/api/event', { initData: A, name: 'share_click' });
 
-  const m = await (await fetch(B + '/api/metrics')).json() as Record<string, any>;
+  const m = ((await (await fetch(B + '/api/metrics')).json()) as Record<string, any>).gate3;
   ok('метрики бачать виклик, відкриття й відповідь',
     m.challengesCreated === 1 && m.challengeOpens === 1 && m.challengeReplies === 1,
     JSON.stringify({ c: m.challengesCreated, o: m.challengeOpens, r: m.challengeReplies }));

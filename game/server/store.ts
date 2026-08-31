@@ -29,6 +29,22 @@ export class RunStore {
     return full;
   }
 
+  /**
+   * Покласти ран із ЙОГО ідентифікатором — під час програвання журналу на
+   * старті. Лічильник підтягується, щоб нові рани не почали видавати вже
+   * зайняті id: саме так тихо ламаються сховища після перезапуску.
+   */
+  restore(chatId: string, run: StoredRun): void {
+    const n = parseInt(run.id.slice(1), 36);
+    if (Number.isFinite(n) && n > this.counter) this.counter = n;
+    const k = this.key(chatId, run.seed);
+    const list = this.byKey.get(k) ?? [];
+    list.push(run);
+    list.sort((a, b) => b.score - a.score);
+    if (list.length > 80) list.length = 80;
+    this.byKey.set(k, list);
+  }
+
   list(chatId: string, seed: number): StoredRun[] {
     return this.byKey.get(this.key(chatId, seed)) ?? [];
   }

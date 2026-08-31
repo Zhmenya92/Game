@@ -53,6 +53,16 @@ export class ChallengeStore {
     return c;
   }
 
+  /** Покласти виклик із журналу, не видаючи новий токен. */
+  restore(c: Omit<Challenge, 'opens' | 'replies'> & { opens?: number[]; replies?: number[] }): void {
+    this.byToken.set(c.token, {
+      token: c.token, chatId: c.chatId, ownerId: c.ownerId, seed: c.seed,
+      runId: c.runId, score: c.score, createdAt: c.createdAt,
+      opens: new Set(c.opens ?? []), replies: new Set(c.replies ?? []),
+    });
+    this.seen(c.ownerId, 'organic');
+  }
+
   get(token: string): Challenge | null {
     return this.byToken.get(token) ?? null;
   }

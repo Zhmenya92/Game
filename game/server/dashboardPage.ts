@@ -1,6 +1,9 @@
 import type { GateMetrics } from './metrics.ts';
 import type { Analytics } from './analytics.ts';
 import type { Wallet } from './wallet.ts';
+import { GATE4, type Gate4 } from './retention.ts';
+
+export type Cohort = { day: number; size: number; d1: number | null; d7: number | null };
 
 /**
  * Дашборд аналітики (plan.md, 10.1 — «PostHog як альтернатива, якщо не
@@ -27,6 +30,32 @@ function verdictChip(v: 'ok' | 'low' | 'n/a' | undefined): string {
   return '<span class="chip na">немає даних</span>';
 }
 
+/** Рядки гейта 4. Порожня метрика пишеться словами, а не нулем. */
+function gate4rows(g: Gate4): string {
+  const p = (v: number | null) => v === null ? '<span class="dim">немає даних</span>' : pct(v);
+  const n = (v: number | null) => v === null ? '<span class="dim">немає даних</span>' : num(v);
+  const list: [string, string, string, string][] = [
+    [`D1 retention <span class="dim">— когорта ${g.cohortD1}</span>`, p(g.d1), pct(GATE4.d1), 'd1'],
+    [`D7 retention <span class="dim">— когорта ${g.cohortD7}</span>`, p(g.d7), pct(GATE4.d7), 'd7'],
+    ['Сесій на активний день', n(g.sessionsPerDay), String(GATE4.sessionsPerDay), 'sessionsPerDay'],
+    ['Довжина сесії, хв', n(g.sessionMinutes), String(GATE4.sessionMinutes), 'sessionMinutes'],
+    ['Rewarded opt-in', p(g.rewardedOptIn), pct(GATE4.rewardedOptIn), 'rewardedOptIn'],
+    ['Payer conversion', p(g.payerConversion), pct(GATE4.payerConversion), 'payerConversion'],
+  ];
+  return list.map(([name, val, min, key]) =>
+    `<tr><td>${name}</td><td class="n">${val}</td><td class="n dim">${min}</td>` +
+    `<td>${verdictChip(g.verdict[key])}</td></tr>`).join('');
+}
+
+function cohortRows(cs: readonly Cohort[]): string {
+  if (!cs.length) return '<tr><td colspan="4" class="dim">жодного гравця ще не було</td></tr>';
+  const cell = (v: number | null) =>
+    v === null ? '<span class="dim">ще рано</span>' : pct(v);
+  return cs.map(c =>
+    `<tr><td>доба ${c.day}</td><td class="n">${c.size}</td>` +
+    `<td class="n">${cell(c.d1)}</td><td class="n">${cell(c.d7)}</td></tr>`).join('');
+}
+
 function rows(obj: Record<string, number>): string {
   const keys = Object.keys(obj).sort();
   if (!keys.length) return '<tr><td colspan="2" class="dim">поки порожньо</td></tr>';
@@ -34,7 +63,8 @@ function rows(obj: Record<string, number>): string {
 }
 
 export function dashboardPage(
-  m: GateMetrics, a: Analytics, w: Wallet, runs: number,
+  m: GateMetrics, g4: Gate4, cohorts: readonly Cohort[],
+  a: Analytics, w: Wallet, runs: number,
 ): string {
   const wt = w.totals();
   const deaths = a.count('run_end');
@@ -119,6 +149,19 @@ export function dashboardPage(
     return `<tr><td>${esc(name)}<div class="bar"><i style="width:${Math.min(100, share * 100).toFixed(1)}%"></i></div></td>
       <td class="n">${v}</td><td class="n">${base > 0 ? pct(share) : '<span class="dim">—</span>'}</td></tr>`;
   }).join('')}
+</table>
+
+<h2>Гейт 4 — фінальний</h2>
+<p class="sub">Вісім порогів, що вирішують: стор-фаза чи закриття. Когорта, у якої відповідний день ще не настав, у знаменник <b>не входить</b> — інакше ретеншен занижується самим лише зростанням аудиторії.</p>
+<table>
+  <tr><th>Метрика</th><th>Значення</th><th>Мінімум</th><th>Стан</th></tr>
+  ${gate4rows(g4)}
+</table>
+
+<h2>Когорти</h2>
+<table>
+  <tr><th>День приходу</th><th>Людей</th><th>D1</th><th>D7</th></tr>
+  ${cohortRows(cohorts)}
 </table>
 
 <h2>Гроші й продовження</h2>

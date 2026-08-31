@@ -352,8 +352,10 @@ await (async () => {
   ok('дашборд аналітики віддається', dash.status === 200 && html.includes('<table'));
   ok('дашборд не малює ретеншен, якого немає', html.includes('D1 / D7'));
 
-  const m = await (await fetch(`${B}/api/metrics`)).json() as Record<string, any>;
-  ok('метрики бачать події з аналітики', typeof m.shareRate === 'number');
+  const all = await (await fetch(`${B}/api/metrics`)).json() as Record<string, any>;
+  ok('метрики бачать події з аналітики', typeof all.gate3.shareRate === 'number');
+  ok('метрики гейта 4 віддаються поруч', typeof all.gate4.users === 'number');
+  ok('когорти віддаються масивом', Array.isArray(all.cohorts));
 
   await new Promise<void>(r => srv.close(() => r()));
 })();

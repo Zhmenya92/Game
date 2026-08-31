@@ -56,7 +56,12 @@ export class Analytics {
   private days = new Map<number, { last: number; streak: number }>();
 
   add(name: EventName, userId: number, props: Props = {}): Event {
-    const e: Event = { name, userId, props, at: Date.now() };
+    return this.record(name, userId, props, Date.now());
+  }
+
+  /** Те саме, але з явним часом — для програвання журналу. */
+  record(name: EventName, userId: number, props: Props, at: number): Event {
+    const e: Event = { name, userId, props, at };
     this.events.push(e);
     if (this.events.length > MAX_EVENTS) this.events.splice(0, MAX_EVENTS / 2);
     return e;
@@ -96,6 +101,11 @@ export class Analytics {
       out[k] = (out[k] ?? 0) + 1;
     }
     return out;
+  }
+
+  /** Прямо виставити серію — при програванні журналу. */
+  restoreDay(userId: number, day: number): void {
+    this.touchDay(userId, day);
   }
 
   /**

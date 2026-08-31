@@ -13,6 +13,9 @@ import {
   refundStarPayment, invoicePayload, parsePayload, NoBotToken, PAYSUPPORT_TEXT,
 } from './stars.ts';
 import { dashboardPage } from './dashboardPage.ts';
+import { Journal } from './journal.ts';
+import { Retention, dayOf } from './retention.ts';
+import type { StoredRun } from './verify.ts';
 
 /**
  * Бекенд прототипу (plan.md, 8.1).
@@ -31,6 +34,14 @@ const devAllowUnsigned = () => process.env.DEV_ALLOW_UNSIGNED === '1';
 export const store = new RunStore();
 export const challenges = new ChallengeStore();
 export const analytics = new Analytics();
+export const retention = new Retention();
+
+/**
+ * Журнал. Порожній DATA_DIR вимикає його — так тести й розробка не
+ * сміттять на диск, а софтлонч, навпаки, переживає перезапуск.
+ */
+export const journal = new Journal(process.env.DATA_DIR ?? '');
+const startedAt = Date.now();
 export const wallet = new Wallet();
 export const skins = new Skins();
 
@@ -54,6 +65,38 @@ function auth(initData: string | undefined): Session | { error: string } {
   }
   const r = validateInitData(initData ?? '', botToken());
   return r.ok ? { userId: r.userId, chatId: r.chatId } : { error: r.reason };
+}
+
+/**
+ * Обмеження частоти запитів.
+ *
+ * До софтлончу сервер жив лише в локальній мережі, тож потреби не було.
+ * Публічний бекенд без обмеження — це один цикл `for` у чужій консолі,
+ * який заповнює журнал сміттям і псує рівно ті дані, заради яких
+ * софтлонч і робиться.
+ */
+const buckets = new Map<string, { n: number; until: number }>();
+
+function allow(key: string, perMinute: number): boolean {
+  const now = Date.now();
+  const b = buckets.get(key);
+  if (!b || now > b.until) {
+    buckets.set(key, { n: 1, until: now + 60000 });
+    if (buckets.size > 5000) {
+      for (const [k, v] of buckets) if (now > v.until) buckets.delete(k);
+    }
+    return true;
+  }
+  b.n++;
+  return b.n <= perMinute;
+}
+
+/** Хто саме стукає. За проксі справжня адреса приходить у заголовку. */
+function clientKey(req: IncomingMessage): string {
+  const fwd = req.headers['x-forwarded-for'];
+  const ip = (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0].trim()
+    || req.socket.remoteAddress || 'unknown';
+  return ip;
 }
 
 function json(res: ServerResponse, code: number, body: unknown): void {
@@ -89,8 +132,14 @@ export function grantProduct(
 ): boolean {
   const p = productById(productId);
   if (!p) return false;
-  if (p.kind === 'skin' && p.skinId) return skins.grant(userId, p.skinId, ref);
-  return wallet.grant(userId, p.revives, source, ref);
+  if (p.kind === 'skin' && p.skinId) {
+    const okSkin = skins.grant(userId, p.skinId, ref);
+    if (okSkin) journal.append({ t: 'skin', userId, skinId: p.skinId, ref });
+    return okSkin;
+  }
+  const okGrant = wallet.grant(userId, p.revives, source, ref);
+  if (okGrant) journal.append({ t: 'grant', userId, n: p.revives, source, ref });
+  return okGrant;
 }
 
 /**
@@ -131,7 +180,7 @@ export async function handleUpdate(update: Record<string, any>): Promise<void> {
     if (parsed && Number.isInteger(userId) && chargeId) {
       const fresh = grantProduct(userId, parsed.productId, `tg:${chargeId}`, 'purchase');
       if (fresh) {
-        analytics.add('iap_purchased', userId, {
+        track('iap_purchased', userId, {
           product: parsed.productId,
           stars: Number(sp.total_amount ?? 0),
         });
@@ -153,11 +202,75 @@ export async function handleUpdate(update: Record<string, any>): Promise<void> {
   }
 }
 
+/**
+ * Відновлення стану програванням журналу.
+ *
+ * Тут немає жодної нової ідеї: у грі джерелом істини є трек вводу, а не
+ * знімок стану, — і на сервері так само. Порядок записів у журналі і є
+ * порядок подій, тож достатньо застосувати їх один за одним.
+ */
+export function hydrate(): number {
+  const recs = journal.readAll();
+  for (const r of recs) {
+    switch (r.t) {
+      case 'run': store.restore(r.chatId, r.run as StoredRun); break;
+      case 'challenge': challenges.restore(r.c as never); break;
+      case 'open': challenges.open(r.token, r.userId); break;
+      case 'reply': challenges.reply(r.token, r.userId, r.seed); break;
+      case 'seen': challenges.seen(r.userId, r.how as 'organic' | 'challenge'); break;
+      case 'grant': wallet.grant(r.userId, r.n, r.source as never, r.ref); break;
+      case 'reserve': wallet.applyReserve(r.userId); break;
+      case 'settle': wallet.applySettle(r.userId, r.used); break;
+      case 'skin': skins.grant(r.userId, r.skinId, r.ref); break;
+      case 'day': analytics.restoreDay(r.userId, r.day); break;
+      case 'event':
+        if (isEventName(r.name)) {
+          analytics.record(r.name, r.userId, r.props as never, r.at);
+          retention.touch(r.userId, r.at);
+        }
+        break;
+    }
+  }
+  if (recs.length) console.log(`журнал: відновлено записів — ${recs.length}`);
+  return recs.length;
+}
+
+/** Записати подію аналітики й одразу — у журнал і в ретеншен. */
+function track(name: string, userId: number, props: Record<string, unknown> = {}): void {
+  if (!isEventName(name)) return;
+  const e = analytics.add(name, userId, sanitizeProps(props));
+  retention.touch(userId, e.at);
+  journal.append({ t: 'event', name, userId, props: e.props, at: e.at });
+}
+
 export async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://x');
   const path = url.pathname;
 
   if (req.method === 'OPTIONS') { json(res, 204, {}); return; }
+
+  // Запис коштує дорожче за читання, тому й ліміт для нього суворіший.
+  // Вебхук Telegram виключено: його частоту визначає Telegram, і різати
+  // її означало б втрачати оплати.
+  if (path !== '/api/telegram/webhook') {
+    const write = req.method === 'POST';
+    if (!allow(`${clientKey(req)}|${write ? 'w' : 'r'}`, write ? 120 : 240)) {
+      json(res, 429, { ok: false, reason: 'забагато запитів' });
+      return;
+    }
+  }
+
+  if (path === '/health' && req.method === 'GET') {
+    json(res, 200, {
+      ok: true,
+      uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+      runs: store.size,
+      users: retention.size,
+      events: analytics.all().length,
+      journal: journal.on ? journal.path : 'вимкнено',
+    });
+    return;
+  }
 
   try {
     if (path === '/api/daily' && req.method === 'GET') {
@@ -173,11 +286,13 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       // вже записане в /api/challenge/open і перезаписати його не можна —
       // інакше K-фактор рахувався б від неправильного знаменника.
       challenges.seen(s.userId, 'organic');
+      journal.append({ t: 'seen', userId: s.userId, how: 'organic' });
       // Серія днів (plan.md 10.1, day_streak). Рахує сервер, бо клієнту тут
       // вірити не можна взагалі: «я граю 30 днів поспіль» — це один рядок у
       // консолі браузера.
       const streak = analytics.touchDay(s.userId, dayNumber());
-      analytics.add('day_streak', s.userId, { days: streak });
+      journal.append({ t: 'day', userId: s.userId, day: dayNumber() });
+      track('day_streak', s.userId, { days: streak });
       json(res, 200, {
         ok: true, userId: s.userId, chatId: s.chatId,
         streak,
@@ -237,6 +352,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         return;
       }
 
+      journal.append({ t: 'settle', userId: s.userId, used: v.revives });
       const stored = store.add(s.chatId, {
         ownerId: s.userId, seed: run.seed, traceB64: run.traceB64,
         score: v.score, frames: v.frames, day: dayNumber(),
@@ -245,9 +361,14 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
 
       // Якщо ран зіграно за викликом — це відповідь. Без цього зв'язку
       // reply rate і K-фактор порахувати неможливо.
+      journal.append({ t: 'run', chatId: s.chatId, run: stored });
+
       let repliedTo: string | null = null;
       if (typeof b.challengeToken === 'string' && b.challengeToken) {
-        if (challenges.reply(b.challengeToken, s.userId, run.seed)) repliedTo = b.challengeToken;
+        if (challenges.reply(b.challengeToken, s.userId, run.seed)) {
+          repliedTo = b.challengeToken;
+          journal.append({ t: 'reply', token: b.challengeToken, userId: s.userId, seed: run.seed });
+        }
       }
 
       json(res, 200, {
@@ -273,6 +394,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         return;
       }
       const c = challenges.create(s.chatId, s.userId, seed, runId, mine.score);
+      journal.append({ t: 'challenge', c: { ...c, opens: [], replies: [] } });
       json(res, 200, {
         ok: true,
         token: c.token,
@@ -289,6 +411,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
       const c = challenges.open(String(b.token ?? ''), s.userId);
       if (!c) { json(res, 404, { ok: false, reason: 'виклик не знайдено' }); return; }
+      journal.append({ t: 'open', token: c.token, userId: s.userId });
       json(res, 200, {
         ok: true, seed: c.seed, challengerId: c.ownerId, score: c.score, chatId: c.chatId,
       });
@@ -296,7 +419,11 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     }
 
     if (path === '/api/metrics' && req.method === 'GET') {
-      json(res, 200, computeMetrics(analytics.all(), challenges, store.allRuns()));
+      json(res, 200, {
+        gate3: computeMetrics(analytics.all(), challenges, store.allRuns()),
+        gate4: retention.metrics(analytics.all()),
+        cohorts: retention.cohorts(),
+      });
       return;
     }
 
@@ -311,7 +438,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         json(res, 400, { ok: false, reason: 'невідома подія' });
         return;
       }
-      analytics.add(b.name, s.userId, sanitizeProps(b.props));
+      track(b.name, s.userId, b.props as Record<string, unknown>);
       json(res, 200, { ok: true });
       return;
     }
@@ -342,7 +469,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
       const p = productById(String(b.productId ?? ''));
       if (!p) { json(res, 400, { ok: false, reason: 'немає такого товару' }); return; }
-      analytics.add('iap_open', s.userId, { product: p.id, stars: p.stars });
+      track('iap_open', s.userId, { product: p.id, stars: p.stars });
 
       const nonce = Math.random().toString(36).slice(2, 10);
       const payload = invoicePayload(s.userId, p.id, nonce);
@@ -355,7 +482,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         // позначено в відповіді, щоб ніхто не сплутав із оплатою.
         if (e instanceof NoBotToken && devAllowUnsigned()) {
           grantProduct(s.userId, p.id, `dev:${s.userId}:${nonce}`, 'dev');
-          analytics.add('iap_purchased', s.userId, { product: p.id, stars: 0, dev: true });
+          track('iap_purchased', s.userId, { product: p.id, stars: 0, dev: true });
           json(res, 200, {
             ok: true, dev: true, granted: true, product: p,
             revives: wallet.balance(s.userId),
@@ -378,6 +505,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         json(res, 402, { ok: false, reason: 'немає продовжень' });
         return;
       }
+      journal.append({ t: 'reserve', userId: s.userId });
       json(res, 200, { ok: true, revives: wallet.balance(s.userId) });
       return;
     }
@@ -415,7 +543,10 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
         return;
       }
       const fresh = wallet.grant(userId, 1, 'ad', `ad:${rid}`);
-      if (fresh) analytics.add('ad_watched', userId, { source: 'adsgram' });
+      if (fresh) {
+        journal.append({ t: 'grant', userId, n: 1, source: 'ad', ref: `ad:${rid}` });
+        track('ad_watched', userId, { source: 'adsgram' });
+      }
       json(res, 200, { ok: true, granted: fresh, revives: wallet.balance(userId) });
       return;
     }
@@ -433,7 +564,10 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       }
       const rid = String(b.rid ?? Math.random().toString(36).slice(2));
       const fresh = wallet.grant(s.userId, 1, 'dev', `devad:${rid}`);
-      if (fresh) analytics.add('ad_watched', s.userId, { source: 'dev' });
+      if (fresh) {
+        journal.append({ t: 'grant', userId: s.userId, n: 1, source: 'dev', ref: `devad:${rid}` });
+        track('ad_watched', s.userId, { source: 'dev' });
+      }
       json(res, 200, { ok: true, granted: fresh, revives: wallet.balance(s.userId), dev: true });
       return;
     }
@@ -471,8 +605,11 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
 
     if (path === '/dashboard' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(dashboardPage(computeMetrics(analytics.all(), challenges, store.allRuns()),
-                            analytics, wallet, store.size));
+      res.end(dashboardPage(
+        computeMetrics(analytics.all(), challenges, store.allRuns()),
+        retention.metrics(analytics.all()),
+        retention.cohorts(),
+        analytics, wallet, store.size));
       return;
     }
 
@@ -489,7 +626,19 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
 
 if (import.meta.filename === process.argv[1]) {
   const port = Number(process.env.PORT ?? 8790);
-  createServer(handler).listen(port, '0.0.0.0', () => {
-    console.log(`сервер на :${port}` + (devAllowUnsigned() ? ' (DEV_ALLOW_UNSIGNED)' : ''));
+  hydrate();
+  const srv = createServer(handler);
+  srv.listen(port, '0.0.0.0', () => {
+    console.log(`сервер на :${port}` + (devAllowUnsigned() ? ' (DEV_ALLOW_UNSIGNED)' : '')
+      + (journal.on ? ` · журнал ${journal.path}` : ' · журнал вимкнено (немає DATA_DIR)'));
   });
+  // Хостинги зупиняють процес через SIGTERM. Журнал пишеться синхронно,
+  // тож нічого зливати не треба — досить не обривати запити на льоту.
+  for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(sig, () => {
+      console.log(`${sig}: зупиняюсь`);
+      srv.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 3000).unref();
+    });
+  }
 }

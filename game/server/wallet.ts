@@ -102,6 +102,20 @@ export class Wallet {
     return true;
   }
 
+  /**
+   * Застосувати запис журналу без повторної перевірки балансу. Журнал —
+   * це те, що вже сталося; переграючи його, ми відтворюємо стан, а не
+   * ухвалюємо рішення заново.
+   */
+  applyReserve(userId: number): void {
+    this.balances.set(userId, this.balance(userId) - 1);
+    this.pending.set(userId, this.pendingFor(userId) + 1);
+  }
+
+  applySettle(userId: number, used: number): void {
+    this.pending.set(userId, Math.max(0, this.pendingFor(userId) - used));
+  }
+
   history(userId: number): LedgerEntry[] {
     return this.ledger.filter(e => e.userId === userId);
   }
