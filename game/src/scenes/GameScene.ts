@@ -295,6 +295,10 @@ ${this.atlasError || 'немає текстури atlas'}
     if (typeof nav.share === 'function') {
       try {
         await nav.share({ text, url: c.link });
+        // Подія плану 10.1, якої досі не було: `share_click` — це намір,
+        // `share_sent` — факт. Без другої відрізнити одне від одного
+        // неможливо, а різниця між ними і є місцем, де петля рветься.
+        void api.event('share_sent', { via: 'webshare' });
         this.shareNote = 'надіслано';
         return;
       } catch (e) {
@@ -311,6 +315,7 @@ ${this.atlasError || 'немає текстури atlas'}
     }
     try {
       await navigator.clipboard.writeText(`${text} ${c.link}`);
+      void api.event('share_sent', { via: 'clipboard' });
       this.shareNote = 'посилання скопійовано';
     } catch {
       // Без HTTPS буфера обміну немає — показуємо саме посилання, щоб його

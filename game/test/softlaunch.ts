@@ -217,6 +217,12 @@ await (async () => {
   const h2 = await (await fetch(B + '/health')).json() as Record<string, any>;
   ok('лічильник помилок у /health', h2.clientErrors === 1, String(h2.clientErrors));
 
+  // ДЕФЕКТ 56: дашборд і метрики були відкриті всім, хто знає адресу.
+  {
+    const openNow = await fetch(B + '/dashboard');
+    ok('без ADMIN_SECRET дашборд відкритий (режим розробки)', openNow.status === 200);
+  }
+
   // Обмеження частоти.
   let limited = false;
   for (let i = 0; i < 130 && !limited; i++) {
@@ -230,6 +236,37 @@ await (async () => {
 
   await stop(srv);
   rmSync(dir, { recursive: true, force: true });
+})();
+
+// ── Секрет адміністратора справді закриває дашборд ────────────────────────
+
+await (async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pav-adm-'));
+  const port = 9500 + Math.floor(Math.random() * 90);
+  const B = `http://127.0.0.1:${port}`;
+  const p = spawn(process.execPath, [SERVER], {
+    env: { ...process.env, DATA_DIR: dir, PORT: String(port), ADMIN_SECRET: 'secret-for-tests' },
+    stdio: 'ignore',
+  });
+  try {
+    for (let i = 0; i < 100; i++) {
+      try { if ((await fetch(`${B}/health`)).ok) break; } catch { /* піднімається */ }
+      await new Promise(r => setTimeout(r, 100));
+    }
+    ok('із ADMIN_SECRET дашборд без секрета — 403',
+      (await fetch(`${B}/dashboard`)).status === 403);
+    ok('із правильним секретом — 200',
+      (await fetch(`${B}/dashboard?secret=secret-for-tests`)).status === 200);
+    ok('метрики так само закриті',
+      (await fetch(`${B}/api/metrics`)).status === 403);
+    ok('перевірка живості лишається відкритою',
+      (await fetch(`${B}/health`)).status === 200);
+    const h = await (await fetch(`${B}/health`)).json() as Record<string, any>;
+    ok('і не видає шлях у файловій системі', h.journal === 'увімкнено', String(h.journal));
+  } finally {
+    p.kill('SIGKILL');
+    rmSync(dir, { recursive: true, force: true });
+  }
 })();
 
 console.log(fail === 0 ? '\nSOFTLAUNCH OK' : `\nSOFTLAUNCH FAILED: ${fail}`);

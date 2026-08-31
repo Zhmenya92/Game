@@ -158,6 +158,25 @@ function adminSecretOk(given: string): boolean {
   return want.length >= 8 && given === want;
 }
 
+/**
+ * ДЕФЕКТ 56. Дашборд аналітики, метрики й статистика були доступні будь-кому,
+ * хто знає адресу. На публічному домені це означає, що сторонній бачить
+ * кількість гравців, дохід у Stars, K-фактор і **тексти клієнтських
+ * помилок** — тобто і комерційні дані, і підказки, де гра ламається.
+ *
+ * Правило: якщо ADMIN_SECRET заданий, він обов'язковий; якщо ні — відкрито,
+ * але сервер голосно попереджає на старті. Вимагати секрет завжди означало б
+ * зламати локальну розробку, а мовчазна відкритість — це та сама пастка, за
+ * яку критикувався DEV_ALLOW_UNSIGNED.
+ */
+function adminOk(req: IncomingMessage, url: URL): boolean {
+  const want = process.env.ADMIN_SECRET ?? '';
+  if (want.length < 8) return true;                    // не налаштовано — відкрито
+  const given = url.searchParams.get('secret')
+    ?? String(req.headers['x-admin-secret'] ?? '');
+  return given === want;
+}
+
 /** Видати куплене. Одна точка, щоб оплата й dev-режим не розійшлися. */
 export function grantProduct(
   userId: number, productId: string, ref: string, source: 'purchase' | 'dev',
@@ -297,11 +316,14 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     json(res, 200, {
       ok: true,
       uptimeSec: Math.round((Date.now() - startedAt) / 1000),
-      runs: store.size,
+      // `store.size` упирається в стелю сховища (80 ранів на чат і сід),
+      // тому для здоров'я береться повний лічильник, який не обрізається.
+      runs: store.counters.runs,
       users: retention.size,
       events: analytics.all().length,
       clientErrors: clientErrors.size,
-      journal: journal.on ? journal.path : 'вимкнено',
+      // Шлях у файловій системі стороннім знати не треба — достатньо факту.
+      journal: journal.on ? 'увімкнено' : 'вимкнено',
     });
     return;
   }
@@ -453,6 +475,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     }
 
     if (path === '/api/metrics' && req.method === 'GET') {
+      if (!adminOk(req, url)) { json(res, 403, { ok: false, reason: 'потрібен секрет' }); return; }
       json(res, 200, {
         gate3: computeMetrics(analytics, challenges, store.counters),
         gate4: retention.metrics(analytics),
@@ -656,6 +679,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     }
 
     if (path === '/dashboard' && req.method === 'GET') {
+      if (!adminOk(req, url)) { json(res, 403, { ok: false, reason: 'потрібен секрет' }); return; }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       res.end(dashboardPage(
         computeMetrics(analytics, challenges, store.counters),
@@ -670,6 +694,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     }
 
     if (path === '/api/stats' && req.method === 'GET') {
+      if (!adminOk(req, url)) { json(res, 403, { ok: false, reason: 'потрібен секрет' }); return; }
       json(res, 200, { runs: store.size, events: analytics.all().length, wallet: wallet.totals() });
       return;
     }
@@ -683,6 +708,10 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
 if (import.meta.filename === process.argv[1]) {
   const port = Number(process.env.PORT ?? 8790);
   hydrate();
+  if ((process.env.ADMIN_SECRET ?? '').length < 8) {
+    console.warn('⚠️  ADMIN_SECRET не заданий: /dashboard, /api/metrics і /api/stats '
+      + 'відкриті всім, хто знає адресу. Для софтлончу задайте його.');
+  }
   const srv = createServer(handler);
   srv.listen(port, '0.0.0.0', () => {
     console.log(`сервер на :${port}` + (devAllowUnsigned() ? ' (DEV_ALLOW_UNSIGNED)' : '')

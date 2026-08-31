@@ -91,15 +91,25 @@ export class Analytics {
     set.add(userId);
     this.userSets.set(name, set);
     for (const [k, v] of Object.entries(props)) {
+      const key = `${name}|${k}`;
       if (typeof v === 'number') {
-        const key = `${name}|${k}`;
         this.sums.set(key, (this.sums.get(key) ?? 0) + v);
+        continue;   // числа сумуються, у розподіл не йдуть — див. нижче
       }
-      const bKey = `${name}|${k}`;
-      const b = this.breaks.get(bKey) ?? new Map<string, number>();
+      // ДЕФЕКТ 55. Виправлення дефекту 53 замінило кільцевий буфер на
+      // лічильники — і разом з тим прибрало межу. Розподіл будувався по
+      // КОЖНОМУ полю, включно з рахунком і тривалістю: 20 000 подій дали
+      // 24 000 записів у мапі, тобто пам'ять росла лінійно з кількістю
+      // подій. За два тижні софтлончу це сотні тисяч записів заради
+      // одного питання, яке ми справді ставимо, — причини смерті.
+      //
+      // Тому в розподіл ідуть лише рядки, і не більш як 50 різних значень
+      // на поле. Далі лічильник просто перестає рости: краще втратити
+      // рідкісний хвіст, ніж пам'ять.
+      const b = this.breaks.get(key) ?? new Map<string, number>();
       const label = String(v);
-      b.set(label, (b.get(label) ?? 0) + 1);
-      this.breaks.set(bKey, b);
+      if (b.has(label) || b.size < 50) b.set(label, (b.get(label) ?? 0) + 1);
+      this.breaks.set(key, b);
     }
     return e;
   }

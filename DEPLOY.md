@@ -39,7 +39,10 @@ BOT_TOKEN=123456:AA...            # від BotFather
 BOT_NAME=pavutyna_bot             # без @
 APP_NAME=play                     # коротке ім'я Mini App
 TELEGRAM_WEBHOOK_SECRET=<≥16 випадкових символів>
-ADMIN_SECRET=<≥8 символів>        # для ручних повернень Stars
+ADMIN_SECRET=<≥8 символів>        # ⚠️ ОБОВʼЯЗКОВО: без нього /dashboard,
+                                  # /api/metrics і /api/stats відкриті всім,
+                                  # хто знає адресу — разом із доходом і
+                                  # текстами клієнтських помилок
 ADSGRAM_SECRET=<випадкове>        # якщо є Adsgram
 DATA_DIR=/data                    # ⚠️ ПОСТІЙНИЙ том, не /tmp
 PORT=8790
@@ -101,6 +104,7 @@ BOT_TOKEN=... node tools/setupBot.ts --check
 [ ] Оплата Stars проходить від початку до кінця на власні гроші
 [ ] /paysupport відповідає
 [ ] Сервер перезапущено вручну — /dashboard показує ті самі числа
+[ ] ADMIN_SECRET заданий — /dashboard без нього віддає 403
 [ ] Резервна копія DATA_DIR налаштована
 ```
 

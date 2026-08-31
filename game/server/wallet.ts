@@ -47,19 +47,11 @@ export class Wallet {
     return true;
   }
 
-  /**
-   * Списати за фактом гри. `ref` — ідентифікатор рану, тож повторна
-   * відправка того самого рану не спишe вдруге.
-   */
-  consume(userId: number, n: number, ref: string): boolean {
-    if (n <= 0) return true;
-    if (this.seenRefs.has(ref)) return true;
-    if (this.balance(userId) < n) return false;
-    this.seenRefs.add(ref);
-    this.balances.set(userId, this.balance(userId) - n);
-    this.ledger.push({ userId, delta: -n, source: 'run', ref, at: Date.now() });
-    return true;
-  }
+  // `consume` тут БІЛЬШЕ НЕМАЄ. Списання за фактом надісланого рану — це
+  // і був дефект 51: гравець воскресав і не надсилав ран. Метод лишався
+  // мертвим, але виглядав як робочий шлях, і найпростіший спосіб
+  // повернути ту саму діру — покликати його. Тепер лишились тільки
+  // `reserve` (оплата в мить використання) і `settle` (звірка).
 
   /**
    * Скільки продовжень користувач ОПЛАТИВ, але ще не показав у надісланому

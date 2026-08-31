@@ -85,12 +85,9 @@ export class RunStore {
     return this.list(chatId, seed).filter(r => r.ownerId !== userId).slice(0, limit);
   }
 
-  /** Усі рани — потрібні для метрик гейта 3. */
-  allRuns(): StoredRun[] {
-    const out: StoredRun[] = [];
-    for (const list of this.byKey.values()) out.push(...list);
-    return out;
-  }
+  // `allRuns` прибрано. Метрики читали саме його й через це рахували
+  // частку по 80 НАЙКРАЩИХ ранах чату — дефект 54. Лічильники `counters`
+  // не обрізаються, і повернути зміщення випадково вже не вийде.
 
   get size(): number {
     let n = 0;
