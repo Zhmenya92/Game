@@ -26,7 +26,16 @@ import type { Segment } from '../src/sim/types.ts';
  * з яким гравець дійшов до горизонту.
  */
 
-const LAUNCH_ANGLES_DEG = [0, 8, 16, 24, 32, 40, 48, 56, 64];
+const LAUNCH_ANGLES_DEG = [0, 8, 16, 24, 30, 36, 44, 52, 64];
+
+/**
+ * ДЕФЕКТ 31. Тестові політики перечіплювалися тим самим кадром, у якому
+ * відпустили: щойно  стає false, вони одразу тиснуть знову. Живий
+ * гравець так не грає — між зривом і новим натисканням є пауза. Генератор
+ * траси цю паузу моделює, а тест ні, тому траса, збудована для реального
+ * ритму, провалювала тест на 99.8 % сідів. Пауза 12 кадрів = 100 мс.
+ */
+const REPRESS_COOLDOWN = 12;
 
 export function runWithAngle(
   seed: number,
@@ -39,17 +48,21 @@ export function runWithAngle(
   const sinTarget = Math.sin((angleDeg * Math.PI) / 180);
   let down = false;
   let swings = 0;
+  let releasedAt = -1000;
 
   for (let f = 0; f < horizonFrames && sim.state.alive; f++) {
     const s = sim.state;
 
     if (!s.attached) {
-      if (!down) { down = true; trace.record(f, 'down'); swings++; }
+      if (!down && f - releasedAt >= REPRESS_COOLDOWN) {
+        down = true; trace.record(f, 'down'); swings++;
+      }
     } else if (down) {
       const sp = len(s.vx, s.vy);
       // -vy > 0 означає рух угору (вісь Y спрямована вниз).
       if (sp > 0 && s.vx > 0 && (-s.vy) / sp >= sinTarget) {
         down = false;
+        releasedAt = f;
         trace.record(f, 'up');
       }
     }
@@ -95,12 +108,13 @@ function rollout(base: Simulation, angleDeg: number, frames: number): number {
   const sim = base.clone();
   const sinT = Math.sin((angleDeg * Math.PI) / 180);
   let down = sim.state.attached;
+  let rel = -1000;
   for (let i = 0; i < frames && sim.state.alive; i++) {
     const s = sim.state;
-    if (!s.attached) { if (!down) down = true; }
+    if (!s.attached) { if (!down && i - rel >= REPRESS_COOLDOWN) down = true; }
     else if (down) {
       const sp = len(s.vx, s.vy);
-      if (sp > 0 && s.vx > 0 && (-s.vy) / sp >= sinT) down = false;
+      if (sp > 0 && s.vx > 0 && (-s.vy) / sp >= sinT) { down = false; rel = i; }
     }
     sim.step(down);
   }

@@ -1,6 +1,8 @@
 import { BALANCE } from '../config/balance.ts';
 import { len } from './MathDet.ts';
+import { integrate, baseSpeedAt } from './physics.ts';
 import { Track } from './Track.ts';
+import { makeTrack } from './trackFactory.ts';
 import { selectTarget } from './Targeting.ts';
 import type { Segment, Target } from './types.ts';
 
@@ -49,8 +51,8 @@ export class Simulation {
   private releaseIndex = 0;
   private result_: SimResult | null = null;
 
-  constructor(seed: number, foreignWeb: readonly Segment[] = []) {
-    this.track = new Track(seed);
+  constructor(seed: number, foreignWeb: readonly Segment[] = [], track?: Track) {
+    this.track = track ?? makeTrack(seed);
     this.foreignWeb = foreignWeb.slice();
     this.state = {
       frame: 0,
@@ -70,10 +72,7 @@ export class Simulation {
 
   /** Базова швидкість на поточному кадрі: +8 од/с кожні 10 с, стеля 520. */
   private baseSpeedNow(): number {
-    const seconds = this.state.frame * BALANCE.dt;
-    const gain = Math.floor(seconds / 10) * BALANCE.speedGainPer10s;
-    const v = BALANCE.baseSpeed + gain;
-    return v > BALANCE.speedCap ? BALANCE.speedCap : v;
+    return baseSpeedAt(this.state.frame);
   }
 
   /** Усі цілі-відрізки: чужі плюс власні цього рану. */
@@ -109,6 +108,11 @@ export class Simulation {
         bornDay: 0,
       });
     }
+    // Поштовх на зриві (дефект 29): компенсує втрату висоти за замах.
+    const sp = len(s.vx, s.vy);
+    const boosted = sp * BALANCE.releaseBoost;
+    const capped = boosted > BALANCE.maxSpeed ? BALANCE.maxSpeed : boosted;
+    if (sp > 0) { const k = capped / sp; s.vx *= k; s.vy *= k; }
     s.attached = false;
     s.attachedToAnchor = false;
     this.currentTarget = null;
@@ -144,32 +148,9 @@ export class Simulation {
     if (wantAttach && !s.attached) this.tryAttach();
     this.prevDown = pointerDown;
 
-    // ── Фізика ──────────────────────────────────────────────────────────
+    // ── Фізика ── спільний крок із генератором траси (physics.ts)
     const dt = BALANCE.dt;
-    s.vy += BALANCE.gravity * dt;
-    s.px += s.vx * dt;
-    s.py += s.vy * dt;
-
-    if (s.attached) {
-      const dx = s.px - s.ax;
-      const dy = s.py - s.ay;
-      const d = len(dx, dy);
-      if (d > 0) {
-        const nx = dx / d;
-        const ny = dy / d;
-        // Жорсткий трос: позиція повертається на коло радіуса ropeLen.
-        s.px = s.ax + nx * s.ropeLen;
-        s.py = s.ay + ny * s.ropeLen;
-        // Радіальна складова швидкості гаситься, тангенціальна лишається.
-        const radial = s.vx * nx + s.vy * ny;
-        s.vx -= radial * nx;
-        s.vy -= radial * ny;
-      }
-    } else {
-      // Підлога швидкості: траса нескінченна, гравець завжди їде вперед.
-      const base = this.baseSpeedNow();
-      if (s.vx < base) s.vx = base;
-    }
+    integrate(s, s.attached, s.ax, s.ay, s.ropeLen, this.baseSpeedNow());
 
     s.killX += this.baseSpeedNow() * BALANCE.chaseSpeedScale * dt;
     s.frame += 1;

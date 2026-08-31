@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  server: { port: 8788, host: '127.0.0.1' },
-  preview: { port: 8788, host: '127.0.0.1' },
+  // 0.0.0.0 — щоб гру можна було відкрити з телефона в тій самій мережі.
+  server: { port: 8788, host: '0.0.0.0' },
+  preview: { port: 8788, host: '0.0.0.0' },
   build: { target: 'es2022' },
 });
