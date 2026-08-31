@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, appendFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Retention, GATE4 } from '../server/retention.ts';
+import { Retention, GATE4, countersFrom } from '../server/retention.ts';
 import { Journal } from '../server/journal.ts';
 
 /**
@@ -48,7 +48,7 @@ const DAY = 86400000;
   // Гравець C: прийшов у день 7 — для нього ні D1, ні D7 ще не настали.
   r.touch(3, t0 + 7 * DAY);
 
-  const m = r.metrics([], t0 + 7 * DAY + 3600000);
+  const m = r.metrics(countersFrom([]), t0 + 7 * DAY + 3600000);
   ok('усі троє порахувалися як гравці', m.users === 3, String(m.users));
   ok('когорта D1 — лише ті, у кого день настав', m.cohortD1 === 2, String(m.cohortD1));
   ok('когорта D7 — так само', m.cohortD7 === 2, String(m.cohortD7));
@@ -56,7 +56,7 @@ const DAY = 86400000;
   ok('D7 = 1 з 2', Math.abs((m.d7 ?? -1) - 0.5) < 1e-9, String(m.d7));
 
   // Той самий набір, але «сьогодні» — день приходу. Питати нема про що.
-  const early = r.metrics([], t0 + 3600000);
+  const early = r.metrics(countersFrom([]), t0 + 3600000);
   ok('на першу добу D1 ще НЕМАЄ ДАНИХ, а не нуль', early.d1 === null, String(early.d1));
   ok('і вердикт каже n/a', early.verdict.d1 === 'n/a', early.verdict.d1);
 
@@ -83,7 +83,7 @@ const DAY = 86400000;
   r.touch(9, t0 + 130 * 60000);
   r.touch(9, t0 + 136 * 60000);
 
-  const m = r.metrics([], t0 + 137 * 60000);
+  const m = r.metrics(countersFrom([]), t0 + 137 * 60000);
   ok('дві сесії за день, бо між ними більш ніж півгодини',
     Math.abs((m.sessionsPerDay ?? 0) - 2) < 1e-9, String(m.sessionsPerDay));
   ok('середня довжина сесії — 8 хвилин',
@@ -102,9 +102,15 @@ const DAY = 86400000;
     { name: 'ad_watched', userId: 1 },     // той самий — не подвоює
     { name: 'iap_purchased', userId: 2 },
   ];
-  const m = r.metrics(events, t0 + 3600000);
-  ok('rewarded opt-in — за РІЗНИМИ людьми, а не за подіями',
-    Math.abs((m.rewardedOptIn ?? 0) - 0.25) < 1e-9, String(m.rewardedOptIn));
+  const m = r.metrics(countersFrom(events), t0 + 3600000);
+  // ДЕФЕКТ 52. Спершу opt-in рахувався за РІЗНИМИ ЛЮДЬМИ: скільки з тих,
+  // кому показали, подивилися хоч раз. Репетиція софтлончу показала, чому
+  // це неправильно: з десятком пропозицій на гравця метрика насичується до
+  // одиниці (82 % при закладених 22 %) і, головне, накручується простим
+  // збільшенням кількості показів. Знаменник — ПОКАЗИ: 2 перегляди з 4
+  // пропозицій, а не 1 людина з 4.
+  ok('rewarded opt-in рахується за ПОКАЗАМИ, а не за людьми',
+    Math.abs((m.rewardedOptIn ?? 0) - 0.5) < 1e-9, String(m.rewardedOptIn));
   ok('payer conversion від усіх гравців',
     Math.abs((m.payerConversion ?? 0) - 0.1) < 1e-9, String(m.payerConversion));
   ok('пороги гейта 4 взяті з плану',
@@ -195,6 +201,21 @@ await (async () => {
   ok('метрики рахуються з відновлених даних', m.gate4.users === 1, JSON.stringify(m.gate4));
   ok('причина смерті теж збереглася',
     readFileSync(join(dir, 'journal.jsonl'), 'utf8').includes('"cause":"left"'));
+
+  // Клієнтські помилки: без них софтлонч сліпий на падіння.
+  const anon = await fetch(B + '/api/clienterror', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ message: 'без сесії' }),
+  });
+  ok('помилка без сесії не приймається', anon.status === 401);
+  const errOk = await post('/api/clienterror', { initData: U, message: 'TypeError: x is not a function', where: 'main.ts:1:1' });
+  ok('помилка з сесією приймається', errOk.s === 200);
+  const empty = await post('/api/clienterror', { initData: U, message: '' });
+  ok('порожнє повідомлення відхиляється', empty.s === 400);
+  const dash = await (await fetch(B + '/dashboard')).text();
+  ok('помилка видно на дашборді', dash.includes('is not a function'));
+  const h2 = await (await fetch(B + '/health')).json() as Record<string, any>;
+  ok('лічильник помилок у /health', h2.clientErrors === 1, String(h2.clientErrors));
 
   // Обмеження частоти.
   let limited = false;

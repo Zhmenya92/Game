@@ -5,6 +5,7 @@ import { buildWeb, type StoredRun } from '../server/verify.ts';
 import type { Segment } from '../src/sim/types.ts';
 import { ChallengeStore } from '../server/challenge.ts';
 import { computeMetrics } from '../server/metrics.ts';
+import { countersFrom } from '../server/retention.ts';
 import { handler } from '../server/index.ts';
 
 /**
@@ -68,7 +69,8 @@ console.log('challenge');
     ...Array(50).fill({ name: 'run_end' }),
     ...Array(4).fill({ name: 'share_click' }),
   ];
-  const m = computeMetrics(events, cs, runs);
+  const m = computeMetrics(countersFrom(events as never), cs,
+    { runs: runs.length, withForeign: runs.filter(r => (r.foreignHooks ?? 0) > 0).length });
 
   ok('share rate = шери / смерті', Math.abs(m.shareRate - 4 / 50) < 1e-9, String(m.shareRate));
   ok('відкриттів на виклик, а не конверсія', Math.abs(m.opensPerChallenge - 8 / 4) < 1e-9, String(m.opensPerChallenge));
@@ -81,7 +83,7 @@ console.log('challenge');
     && m.verdict.foreignHookRate === 'ok' && m.verdict.kFactor === 'ok',
     JSON.stringify(m.verdict));
 
-  const empty = computeMetrics([], new ChallengeStore(), []);
+  const empty = computeMetrics(countersFrom([]), new ChallengeStore(), { runs: 0, withForeign: 0 });
   ok('на порожніх даних метрики не брешуть', empty.verdict.shareRate === 'n/a'
     && empty.kFactor === 0 && empty.foreignHookRate === 0);
 }

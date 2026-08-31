@@ -128,6 +128,11 @@ export const api = {
     return call('/api/revive', { initData: telegram.initData() });
   },
 
+  /** Повідомити про падіння клієнта. Тихо: звіт про помилку не має шуміти. */
+  async clientError(message: string, where: string): Promise<void> {
+    void call('/api/clienterror', { initData: telegram.initData(), message, where });
+  },
+
   async setSkin(skinId: string): Promise<{ ok: boolean } | null> {
     return call('/api/skin', { initData: telegram.initData(), skinId });
   },

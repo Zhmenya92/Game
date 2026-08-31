@@ -33,7 +33,8 @@ export type Rec =
   | { t: 'settle'; userId: number; used: number }
   | { t: 'skin'; userId: number; skinId: string; ref: string }
   | { t: 'event'; name: string; userId: number; props: Record<string, unknown>; at: number }
-  | { t: 'day'; userId: number; day: number };
+  | { t: 'day'; userId: number; day: number }
+  | { t: 'error'; userId: number; message: string; where: string; ua: string; at: number };
 
 export class Journal {
   private readonly file: string;

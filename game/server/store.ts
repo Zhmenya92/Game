@@ -11,6 +11,30 @@ export class RunStore {
   private byKey = new Map<string, StoredRun[]>();
   private counter = 0;
 
+  /**
+   * ДЕФЕКТ 54, знайдений репетицією софтлончу.
+   *
+   * Сховище тримає лише 80 найкращих ранів чату на сіді — це правильно для
+   * павутини, бо видимих ліній усе одно менше. Але ghost-hook rate гейта 3
+   * рахувався перебором `allRuns()`, тобто **по зрізаному й зміщеному
+   * набору**: лишалися рани з найвищим рахунком, а вони не типові.
+   *
+   * Лічильники нижче не обрізаються ніколи, тому метрика бачить усі рани,
+   * а не найкращі.
+   */
+  private totalRuns = 0;
+  private totalWithForeign = 0;
+
+  /** Скільки ранів було взагалі і скільки з них із чужими зачепленнями. */
+  get counters(): { runs: number; withForeign: number } {
+    return { runs: this.totalRuns, withForeign: this.totalWithForeign };
+  }
+
+  private countRun(run: StoredRun): void {
+    this.totalRuns++;
+    if ((run.foreignHooks ?? 0) > 0) this.totalWithForeign++;
+  }
+
   private key(chatId: string, seed: number): string {
     return `${chatId}|${seed}`;
   }
@@ -18,6 +42,7 @@ export class RunStore {
   add(chatId: string, run: Omit<StoredRun, 'id'>): StoredRun {
     const id = `r${(++this.counter).toString(36).padStart(6, '0')}`;
     const full: StoredRun = { ...run, id };
+    this.countRun(full);
     const k = this.key(chatId, run.seed);
     const list = this.byKey.get(k) ?? [];
     list.push(full);
@@ -35,6 +60,7 @@ export class RunStore {
    * зайняті id: саме так тихо ламаються сховища після перезапуску.
    */
   restore(chatId: string, run: StoredRun): void {
+    this.countRun(run);
     const n = parseInt(run.id.slice(1), 36);
     if (Number.isFinite(n) && n > this.counter) this.counter = n;
     const k = this.key(chatId, run.seed);

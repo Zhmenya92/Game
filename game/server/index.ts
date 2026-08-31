@@ -41,6 +41,38 @@ export const retention = new Retention();
  * сміттять на диск, а софтлонч, навпаки, переживає перезапуск.
  */
 export const journal = new Journal(process.env.DATA_DIR ?? '');
+
+/**
+ * Клієнтські помилки софтлончу.
+ *
+ * До цього моменту гра падала МОВЧКИ. Якщо на якомусь Android білий екран,
+ * ми дізналися б про це лише тоді, коли хтось із півсотні запрошених
+ * здогадався б написати — тобто, найімовірніше, ніколи. Замість цього
+ * лишилося б враження, що «людям не зайшло».
+ *
+ * Тримаємо небагато й у стислому вигляді: однакові помилки об'єднуються за
+ * текстом, бо один зламаний пристрій інакше заповнить усе.
+ */
+export type ClientError = {
+  message: string; where: string; ua: string;
+  count: number; users: Set<number>; firstAt: number; lastAt: number;
+};
+export const clientErrors = new Map<string, ClientError>();
+
+function noteError(userId: number, message: string, where: string, ua: string, at: number): void {
+  const key = message.slice(0, 120);
+  const e = clientErrors.get(key);
+  if (e) {
+    e.count++; e.users.add(userId); e.lastAt = at;
+    if (!e.where && where) e.where = where;
+    return;
+  }
+  if (clientErrors.size >= 200) return;   // далі вже не діагностика, а шум
+  clientErrors.set(key, {
+    message: key, where: where.slice(0, 200), ua: ua.slice(0, 120),
+    count: 1, users: new Set([userId]), firstAt: at, lastAt: at,
+  });
+}
 const startedAt = Date.now();
 export const wallet = new Wallet();
 export const skins = new Skins();
@@ -223,6 +255,7 @@ export function hydrate(): number {
       case 'settle': wallet.applySettle(r.userId, r.used); break;
       case 'skin': skins.grant(r.userId, r.skinId, r.ref); break;
       case 'day': analytics.restoreDay(r.userId, r.day); break;
+      case 'error': noteError(r.userId, r.message, r.where, r.ua, r.at); break;
       case 'event':
         if (isEventName(r.name)) {
           analytics.record(r.name, r.userId, r.props as never, r.at);
@@ -267,6 +300,7 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       runs: store.size,
       users: retention.size,
       events: analytics.all().length,
+      clientErrors: clientErrors.size,
       journal: journal.on ? journal.path : 'вимкнено',
     });
     return;
@@ -420,8 +454,8 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
 
     if (path === '/api/metrics' && req.method === 'GET') {
       json(res, 200, {
-        gate3: computeMetrics(analytics.all(), challenges, store.allRuns()),
-        gate4: retention.metrics(analytics.all()),
+        gate3: computeMetrics(analytics, challenges, store.counters),
+        gate4: retention.metrics(analytics),
         cohorts: retention.cohorts(),
       });
       return;
@@ -444,6 +478,24 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     }
 
     // ── Магазин і продовження (plan.md, 10.2) ────────────────────────────
+
+    if (path === '/api/clienterror' && req.method === 'POST') {
+      const b = await readBody(req);
+      const s = auth(b.initData as string | undefined);
+      if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
+      // Окремий, жорсткіший ліміт: помилка в циклі рендера дала б сотні
+      // запитів на секунду з одного пристрою.
+      if (!allow(`err|${s.userId}`, 6)) { json(res, 429, { ok: false }); return; }
+      const message = String(b.message ?? '').slice(0, 200);
+      if (!message) { json(res, 400, { ok: false, reason: 'порожнє повідомлення' }); return; }
+      const where = String(b.where ?? '').slice(0, 200);
+      const ua = String(req.headers['user-agent'] ?? '').slice(0, 120);
+      const at = Date.now();
+      noteError(s.userId, message, where, ua, at);
+      journal.append({ t: 'error', userId: s.userId, message, where, ua, at });
+      json(res, 200, { ok: true });
+      return;
+    }
 
     if (path === '/api/shop' && req.method === 'POST') {
       const b = await readBody(req);
@@ -606,10 +658,14 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     if (path === '/dashboard' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       res.end(dashboardPage(
-        computeMetrics(analytics.all(), challenges, store.allRuns()),
-        retention.metrics(analytics.all()),
+        computeMetrics(analytics, challenges, store.counters),
+        retention.metrics(analytics),
         retention.cohorts(),
-        analytics, wallet, store.size));
+        analytics, wallet, store.size,
+        [...clientErrors.values()]
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 20)
+          .map(e => ({ message: e.message, where: e.where, ua: e.ua, count: e.count, users: e.users.size }))));
       return;
     }
 

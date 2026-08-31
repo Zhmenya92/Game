@@ -46,15 +46,22 @@ export type GateMetrics = {
   verdict: Record<string, 'ok' | 'low' | 'n/a'>;
 };
 
-export function computeMetrics(
-  events: readonly { name: string }[],
-  challenges: ChallengeStore,
-  runs: readonly StoredRun[],
-): GateMetrics {
-  const count = (n: string) => events.reduce((a, e) => a + (e.name === n ? 1 : 0), 0);
+/**
+ * Джерела чисел. Навмисно НЕ списки подій і не список ранів: обидва
+ * обрізаються (дефекти 53 і 54), і метрика тихо дрейфує тим сильніше, чим
+ * довше йде збір.
+ */
+export type Counters = {
+  count(name: 'run_end' | 'share_click'): number;
+};
 
-  const deaths = count('run_end');
-  const shareClicks = count('share_click');
+export function computeMetrics(
+  analytics: Counters,
+  challenges: ChallengeStore,
+  runCounters: { runs: number; withForeign: number },
+): GateMetrics {
+  const deaths = analytics.count('run_end');
+  const shareClicks = analytics.count('share_click');
 
   const all = challenges.all();
   const challengesCreated = all.length;
@@ -77,8 +84,7 @@ export function computeMetrics(
   const conversion = ratio(origins.viaChallenge, challengeOpens);
   const kFactor = invitesPerSender * conversion;
 
-  const withForeign = runs.reduce((a, r) => a + ((r.foreignHooks ?? 0) > 0 ? 1 : 0), 0);
-  const foreignHookRate = ratio(withForeign, runs.length);
+  const foreignHookRate = ratio(runCounters.withForeign, runCounters.runs);
 
   const shareRate = ratio(shareClicks, deaths);
   const opensPerChallenge = ratio(challengeOpens, challengesCreated);
@@ -89,7 +95,7 @@ export function computeMetrics(
 
   return {
     deaths, shareClicks, challengesCreated, challengeOpens, challengeReplies,
-    shareRate, opensPerChallenge, replyRate, kFactor, foreignHookRate, runs: runs.length,
+    shareRate, opensPerChallenge, replyRate, kFactor, foreignHookRate, runs: runCounters.runs,
     verdict: {
       shareRate: judge(shareRate, 0.02, deaths > 0),
       // Поріг 0.5 відкриття на виклик — власна оцінка, бо порогу плану
@@ -97,7 +103,7 @@ export function computeMetrics(
       opensPerChallenge: judge(opensPerChallenge, 0.5, challengesCreated > 0),
       replyRate: judge(replyRate, 0.5, challengeOpens > 0),
       kFactor: judge(kFactor, 0.25, challengesCreated > 0),
-      foreignHookRate: judge(foreignHookRate, 0.3, runs.length > 0),
+      foreignHookRate: judge(foreignHookRate, 0.3, runCounters.runs > 0),
     },
   };
 }

@@ -62,9 +62,14 @@ function rows(obj: Record<string, number>): string {
   return keys.map(k => `<tr><td>${esc(k)}</td><td class="n">${obj[k]}</td></tr>`).join('');
 }
 
+export type ErrorRow = {
+  message: string; where: string; ua: string; count: number; users: number;
+};
+
 export function dashboardPage(
   m: GateMetrics, g4: Gate4, cohorts: readonly Cohort[],
   a: Analytics, w: Wallet, runs: number,
+  errors: readonly ErrorRow[] = [],
 ): string {
   const wt = w.totals();
   const deaths = a.count('run_end');
@@ -172,6 +177,16 @@ export function dashboardPage(
   <div class="card"><div class="v">${a.count('ad_watched')}</div><div class="k">переглядів реклами</div></div>
   <div class="card"><div class="v">${wt.granted} / ${wt.consumed}</div><div class="k">продовжень видано / витрачено</div></div>
 </div>
+
+<h2>Помилки на клієнтах</h2>
+<p class="sub">До софтлончу гра падала мовчки: про білий екран на чужому Android ми дізналися б лише тоді, коли хтось здогадався б написати — тобто найімовірніше ніколи, а лишилося б враження, що «людям не зайшло».</p>
+<table>
+  <tr><th>Помилка</th><th>Разів</th><th>Людей</th></tr>
+  ${errors.length ? errors.map(e => `<tr>
+    <td>${esc(e.message)}<div class="dim" style="font-size:12px">${esc(e.where)}<br>${esc(e.ua)}</div></td>
+    <td class="n">${e.count}</td><td class="n">${e.users}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="dim">жодної — або жодного гравця ще не було</td></tr>'}
+</table>
 
 <h2>Що ще видно</h2>
 <div class="grid">

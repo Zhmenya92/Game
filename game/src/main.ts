@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
 import { BALANCE } from './config/balance.ts';
 import { GameScene } from './scenes/GameScene.ts';
+import { installErrorReporting } from './net/errors.ts';
+
+// Ставиться ДО створення гри: падіння в конструкторі Phaser — теж падіння,
+// і саме воно дає білий екран, про який ніхто не повідомить.
+installErrorReporting();
 
 new Phaser.Game({
   type: Phaser.AUTO,

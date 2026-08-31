@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "node tools/makeAtlas.ts && vite build",
     "preview": "node tools/preview.ts",
-    "test": "node test/determinism.ts && node test/replay.ts && node test/server.ts && node test/challenge.ts && node test/monetization.ts && node test/accessibility.ts && node test/softlaunch.ts && node test/assets.ts && node test/fairness.ts",
+    "test": "node test/determinism.ts && node test/replay.ts && node test/server.ts && node test/challenge.ts && node test/monetization.ts && node test/accessibility.ts && node test/softlaunch.ts && node tools/rehearse.ts 150 14 && node test/assets.ts && node test/fairness.ts",
     "test:determinism": "node test/determinism.ts",
     "test:fairness": "node test/fairness.ts",
     "sweep": "node tools/sweep3.ts",
@@ -23,7 +23,8 @@
     "test:monetization": "node test/monetization.ts",
     "test:accessibility": "node test/accessibility.ts",
     "test:softlaunch": "node test/softlaunch.ts",
-    "setup:bot": "node tools/setupBot.ts"
+    "setup:bot": "node tools/setupBot.ts",
+    "rehearse": "node tools/rehearse.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

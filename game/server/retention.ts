@@ -59,6 +59,20 @@ export const GATE4 = {
   payerConversion: 0.01,
 } as const;
 
+/**
+ * Перехідник для тестів: робить із масиву подій те саме джерело
+ * лічильників, яке в бойовому коді дає Analytics. Потрібен, щоб тест міг
+ * задати рівно ті події, які перевіряє, і не піднімати весь сервер.
+ */
+export function countersFrom(
+  events: readonly { name: string; userId: number }[],
+): { count(n: never): number; users(n: never): number } {
+  return {
+    count: (n: never) => events.reduce((a, e) => a + (e.name === n ? 1 : 0), 0),
+    users: (n: never) => new Set(events.filter(e => e.name === n).map(e => e.userId)).size,
+  };
+}
+
 export class Retention {
   private users = new Map<number, User>();
 
@@ -98,7 +112,11 @@ export class Retention {
     return { rate: cohort > 0 ? kept / cohort : null, cohort };
   }
 
-  metrics(events: readonly { name: string; userId: number }[], now = Date.now()): Gate4 {
+  /**
+   * `src` — джерело лічильників подій, а не список: список обрізається
+   * (дефект 53), і на двотижневому наборі метрики тихо розходяться.
+   */
+  metrics(src: { count(n: never): number; users(n: never): number }, now = Date.now()): Gate4 {
     const today = dayOf(now);
     const d1 = this.retentionAt(1, today);
     const d7 = this.retentionAt(7, today);
@@ -112,14 +130,18 @@ export class Retention {
       activeDays += u.days.size;
     }
 
-    const uniq = (name: string): number => {
-      const s = new Set<number>();
-      for (const e of events) if (e.name === name) s.add(e.userId);
-      return s.size;
-    };
+    const count = (name: string): number => src.count(name as never);
+    const uniq = (name: string): number => src.users(name as never);
 
-    const offered = uniq('ad_offer');
-    const watched = uniq('ad_watched');
+    // ДЕФЕКТ 52, знайдений репетицією софтлончу. Opt-in рахувався за
+    // РІЗНИМИ ЛЮДЬМИ: скільки з тих, кому показали, подивилися хоч раз.
+    // На синтетичному наборі з десятком пропозицій на гравця це дало 82 %
+    // при закладених 22 %. Метрика насичується до одиниці й перестає
+    // розрізняти — а головне, накручується простим збільшенням кількості
+    // показів. Правильний знаменник — ПОКАЗИ, а не люди: питання в тому,
+    // чи привабливий сам показ, а не чи погодився хтось хоч колись.
+    const offered = count('ad_offer');
+    const watched = count('ad_watched');
     const payers = uniq('iap_purchased');
     const n = this.users.size;
 

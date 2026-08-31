@@ -55,6 +55,27 @@ export class Analytics {
   /** Останній день і довжина серії — для `day_streak`. */
   private days = new Map<number, { last: number; streak: number }>();
 
+  /**
+   * ДЕФЕКТ 53, знайдений репетицією софтлончу.
+   *
+   * Метрики рахувалися перебором `events`, а цей список обрізається:
+   * після 20 000 подій половина найстаріших викидається. На синтетичному
+   * наборі за два тижні (29 400 подій) це зʼїло рівно ті події, що
+   * трапляються НА ПОЧАТКУ життя гравця, — покупки й перші перегляди
+   * реклами. Payer conversion показав 1.7 % замість 2.0 %, і жодного
+   * попередження при цьому не було.
+   *
+   * Для softлончу це гірше за помилку: дані виглядають правдоподібно й
+   * тихо дрейфують тим сильніше, чим довше йде збір.
+   *
+   * Тому лічильники живуть окремо й НЕ обрізаються ніколи. Список подій
+   * лишається тільки як недавня історія, і метрики його більше не читають.
+   */
+  private counts = new Map<string, number>();
+  private userSets = new Map<string, Set<number>>();
+  private sums = new Map<string, number>();
+  private breaks = new Map<string, Map<string, number>>();
+
   add(name: EventName, userId: number, props: Props = {}): Event {
     return this.record(name, userId, props, Date.now());
   }
@@ -64,43 +85,44 @@ export class Analytics {
     const e: Event = { name, userId, props, at };
     this.events.push(e);
     if (this.events.length > MAX_EVENTS) this.events.splice(0, MAX_EVENTS / 2);
+
+    this.counts.set(name, (this.counts.get(name) ?? 0) + 1);
+    const set = this.userSets.get(name) ?? new Set<number>();
+    set.add(userId);
+    this.userSets.set(name, set);
+    for (const [k, v] of Object.entries(props)) {
+      if (typeof v === 'number') {
+        const key = `${name}|${k}`;
+        this.sums.set(key, (this.sums.get(key) ?? 0) + v);
+      }
+      const bKey = `${name}|${k}`;
+      const b = this.breaks.get(bKey) ?? new Map<string, number>();
+      const label = String(v);
+      b.set(label, (b.get(label) ?? 0) + 1);
+      this.breaks.set(bKey, b);
+    }
     return e;
   }
 
   all(): readonly Event[] { return this.events; }
 
   count(name: EventName): number {
-    return this.events.reduce((a, e) => a + (e.name === name ? 1 : 0), 0);
+    return this.counts.get(name) ?? 0;
   }
 
   /** Скільки РІЗНИХ людей зробили подію. Для ретеншену й воронки. */
   users(name: EventName): number {
-    const s = new Set<number>();
-    for (const e of this.events) if (e.name === name) s.add(e.userId);
-    return s.size;
+    return this.userSets.get(name)?.size ?? 0;
   }
 
   sum(name: EventName, prop: string): number {
-    let t = 0;
-    for (const e of this.events) {
-      if (e.name !== name) continue;
-      const v = e.props[prop];
-      if (typeof v === 'number') t += v;
-    }
-    return t;
+    return this.sums.get(`${name}|${prop}`) ?? 0;
   }
 
   /** Розподіл значень поля — для причин смерті. */
   breakdown(name: EventName, prop: string): Record<string, number> {
-    const out: Record<string, number> = {};
-    for (const e of this.events) {
-      if (e.name !== name) continue;
-      const v = e.props[prop];
-      if (v === undefined) continue;
-      const k = String(v);
-      out[k] = (out[k] ?? 0) + 1;
-    }
-    return out;
+    const b = this.breaks.get(`${name}|${prop}`);
+    return b ? Object.fromEntries(b) : {};
   }
 
   /** Прямо виставити серію — при програванні журналу. */
