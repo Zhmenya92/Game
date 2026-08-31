@@ -86,4 +86,4 @@ function runHumanPlayerTraced(seed: number, salt: number) {
 }
 
 console.log(fail === 0 ? '\nREPLAY OK' : `\nREPLAY FAILED: ${fail}`);
-process.exit(fail === 0 ? 0 : 1);
+process.exitCode = fail === 0 ? 0 : 1;

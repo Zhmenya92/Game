@@ -43,6 +43,13 @@ export class RunStore {
     return this.list(chatId, seed).filter(r => r.ownerId !== userId).slice(0, limit);
   }
 
+  /** Усі рани — потрібні для метрик гейта 3. */
+  allRuns(): StoredRun[] {
+    const out: StoredRun[] = [];
+    for (const list of this.byKey.values()) out.push(...list);
+    return out;
+  }
+
   get size(): number {
     let n = 0;
     for (const list of this.byKey.values()) n += list.length;

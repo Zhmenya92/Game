@@ -25,6 +25,8 @@ export type SubmittedRun = {
 
 export type StoredRun = {
   id: string;
+  /** Порахований сервером, не присланий клієнтом. */
+  foreignHooks?: number;
   ownerId: number;
   seed: number;
   traceB64: string;
@@ -34,7 +36,7 @@ export type StoredRun = {
 };
 
 export type VerifyResult =
-  | { ok: true; score: number; frames: number }
+  | { ok: true; score: number; frames: number; foreignHooks: number; webHooks: number }
   | { ok: false; reason: string };
 
 /** Ліміти, які роблять підробку дорожчою за чесну гру. */
@@ -86,7 +88,9 @@ export function verifyRun(
     return { ok: false, reason: `кадр смерті не збігається: заявлено ${run.frames}, пораховано ${s.frame}` };
   }
 
-  return { ok: true, score: s.score, frames: s.frame };
+  // foreignHooks рахує САМ сервер під час переграваня — це головна метрика
+  // концепту К4, і клієнт не може її накрутити.
+  return { ok: true, score: s.score, frames: s.frame, foreignHooks: s.foreignHooks, webHooks: s.webHooks };
 }
 
 /** Павутина з чужих ранів. Порядок детермінований — сортування за id. */

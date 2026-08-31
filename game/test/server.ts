@@ -245,4 +245,4 @@ await (async () => {
 })();
 
 console.log(fail === 0 ? '\nSERVER OK' : `\nSERVER FAILED: ${fail}`);
-process.exit(fail === 0 ? 0 : 1);
+process.exitCode = fail === 0 ? 0 : 1;

@@ -56,4 +56,4 @@ const THRESHOLD = 95; // %
 const rate = (passed / seeds) * 100;
 const ok = rate >= THRESHOLD;
 console.log(ok ? '\nFAIRNESS OK' : `\nFAIRNESS FAILED: ${seeds - passed} непрохідних`);
-process.exit(ok ? 0 : 1);
+process.exitCode = ok ? 0 : 1;

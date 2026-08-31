@@ -67,6 +67,13 @@ export class GameScene extends Phaser.Scene {
   private online = false;
   private netNote = '';
 
+  /** Віральна петля: вхідний виклик і власний останній ран для вихідного. */
+  private incomingToken: string | null = null;
+  private challengerScore = 0;
+  private lastRunId: string | null = null;
+  private shareNote = '';
+  private btnShare!: Phaser.GameObjects.Text;
+
   private gSky!: Phaser.GameObjects.Graphics;
   private gWeb!: Phaser.GameObjects.Graphics;
   private gWorld!: Phaser.GameObjects.Graphics;
@@ -101,6 +108,17 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'ui-monospace, monospace', fontSize: '40px', color: '#ffffff', align: 'center',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
+    // Кнопка виклику. Живе лише на екрані рою: саме там є що надсилати —
+    // рекорд і всі спроби, що до нього привели.
+    this.btnShare = this.add.text(w / 2, h - 130, 'КИНУТИ ВИКЛИК', {
+      fontFamily: 'ui-monospace, monospace', fontSize: '44px', color: '#0a1420',
+      backgroundColor: '#4fd1bc', padding: { x: 44, y: 22 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(25).setVisible(false).setInteractive();
+    this.btnShare.on('pointerdown', (_p: unknown, _x: number, _y: number, e: { stopPropagation: () => void }) => {
+      e?.stopPropagation?.();
+      void this.share();
+    });
+
     const down = () => { this.onPress(); };
     const up = () => { this.pointerDown = false; };
     this.input.on('pointerdown', down);
@@ -123,11 +141,66 @@ export class GameScene extends Phaser.Scene {
   private async connect(): Promise<void> {
     const ses = await api.session();
     this.online = !!ses?.ok;
+    void api.event('app_open');
     if (!this.online) { this.netNote = 'офлайн'; return; }
-    const d = await api.daily();
-    const seed = d?.seed ?? this.seed;
     this.netNote = telegram.inside ? `Telegram ${telegram.version}` : 'браузер';
-    await this.loadSeed(seed);
+
+    // Діп-лінк: t.me/<bot>/<app>?startapp=<токен> (plan.md, 8.2).
+    // Якщо гру відкрили за викликом — грається ТА САМА траса, і саме це
+    // робить порівняння чесним.
+    const token = telegram.startParam();
+    if (token) {
+      const c = await api.openChallenge(token);
+      if (c) {
+        this.incomingToken = token;
+        this.challengerScore = c.score;
+        void api.event('challenge_opened');
+        await this.loadSeed(c.seed);
+        return;
+      }
+    }
+
+    const d = await api.daily();
+    await this.loadSeed(d?.seed ?? this.seed);
+  }
+
+  /** Кинути виклик: створити посилання на цей сід із власним рахунком. */
+  private async share(): Promise<void> {
+    if (!this.online || !this.lastRunId) { this.shareNote = 'нема що надсилати'; return; }
+    const c = await api.challenge(this.seed, this.lastRunId);
+    if (!c) { this.shareNote = 'сервер не дав виклику'; return; }
+    // ДЕФЕКТ 40. Подія йшла ДО створення виклику, тож натискання, яке нічим
+    // не закінчилось, усе одно потрапляло в чисельник share rate. Гейт 3
+    // міряє шери, а не наміри, — тому подія лише коли посилання існує.
+    void api.event('share_click');
+
+    const text = `Мій рахунок ${c.score}. Та сама траса, спробуй обійти.`;
+    const nav = navigator as Navigator & { share?: (d: unknown) => Promise<void> };
+    if (typeof nav.share === 'function') {
+      try {
+        await nav.share({ text, url: c.link });
+        this.shareNote = 'надіслано';
+        return;
+      } catch (e) {
+        // ДЕФЕКТ 41. Будь-яка відмова вважалася скасуванням і глушила
+        // фолбек. У вебв'ю Telegram share падає з NotAllowedError, коли
+        // виклик не визнано жестом користувача, — і гравець лишався без
+        // посилання взагалі. Скасування — це лише AbortError; решта
+        // провалюється в копіювання нижче.
+        if ((e as { name?: string })?.name === 'AbortError') {
+          this.shareNote = 'скасовано';
+          return;
+        }
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${c.link}`);
+      this.shareNote = 'посилання скопійовано';
+    } catch {
+      // Без HTTPS буфера обміну немає — показуємо саме посилання, щоб його
+      // можна було переписати вручну.
+      this.shareNote = c.link;
+    }
   }
 
   /** Забрати чужі рани для сіду й перебудувати павутину. */
@@ -135,6 +208,8 @@ export class GameScene extends Phaser.Scene {
     this.remoteRuns = await api.runs(seed);
     this.attempts = [];
     this.best = 0;
+    // Рекорд належав минулій трасі — виклик за ним кинути вже не можна.
+    this.lastRunId = null;
     this.seed = seed;
     this.rebuildForeignWeb();
     this.restart(seed);
@@ -166,6 +241,11 @@ export class GameScene extends Phaser.Scene {
     this.foreignWeb = [];
     this.day = 0;
     this.best = 0;
+    // ДЕФЕКТ 39. Гравець, що прийшов за викликом, після зміни траси більше
+    // не відповідає на нього: інакше у reply rate потрапляв би ран з
+    // іншого сіду. Сервер це теж перевіряє — тут просто не брешемо йому.
+    this.lastRunId = null;
+    this.incomingToken = null;
     this.restart(this.seed + 1);
   }
 
@@ -253,19 +333,31 @@ export class GameScene extends Phaser.Scene {
       traceB64: btoa(bin),
       score, frames,
       webRunIds: this.remoteRuns.map(x => x.id),
+      challengeToken: this.incomingToken,
     });
     if (r && r.ok === false) this.netNote = `сервер відхилив: ${r.reason ?? '?'}`;
+    if (r && r.ok && r.id) this.lastRunId = r.id;
     void api.event('run_end');
+    // ДЕФЕКТ 42. Подія летіла на КОЖНОМУ рані, доки токен був виставлений,
+    // хоча відповідь зараховується лише перша. Сервер повертає repliedTo
+    // тільки коли справді зарахував — на нього й спираємось.
+    if (r && r.ok && r.repliedTo) {
+      void api.event('challenge_replied');
+      this.incomingToken = null;
+    }
   }
 
   private startSwarm(): void {
     this.mode = 'swarm';
     this.swarm = buildSwarm(this.seed, this.attempts, this.foreignWeb);
     this.swarmFrame = 0;
+    this.shareNote = '';
+    this.btnShare.setVisible(this.online);
   }
 
   private endSwarm(): void {
     this.swarm = [];
+    this.btnShare.setVisible(false);
     this.restart(this.seed);
   }
 
@@ -447,6 +539,8 @@ export class GameScene extends Phaser.Scene {
     this.txtSub.setText(`рекорд ${this.best}   спроба ${this.attempts.length + 1}   ліній ${this.sim.ownWeb.length + this.foreignWeb.length}` + (this.netNote ? `   ${this.netNote}` : ''));
     this.txtHint.setText(
       this.mode === 'dead' ? ''
+      : s.frame < 150 && this.incomingToken
+        ? `ТЕБЕ ВИКЛИКАЛИ\nйого рахунок ${this.challengerScore}\nта сама траса`
       : s.frame < 150 && !s.attached ? 'ТРИМАЙ — чіпляєшся\nВІДПУСТИ — летиш'
       : '',
     );
@@ -489,7 +583,8 @@ export class GameScene extends Phaser.Scene {
     this.drawFlash();
 
     this.txtScore.setText(String(lead.attempt.score));
-    this.txtSub.setText(`${this.swarm.length} спроб одночасно · загинуло ${died}`);
+    this.txtSub.setText(`${this.swarm.length} спроб одночасно · загинуло ${died}`
+      + (this.shareNote ? `  ·  ${this.shareNote}` : ''));
     this.txtHint.setText('НОВИЙ РЕКОРД\nусі твої спроби разом\n\nтапни, щоб грати');
   }
 

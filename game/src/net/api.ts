@@ -63,9 +63,29 @@ export const api = {
   },
 
   async submit(run: {
-    seed: number; traceB64: string; score: number; frames: number; webRunIds: string[];
-  }): Promise<{ ok: boolean; reason?: string } | null> {
+    seed: number; traceB64: string; score: number; frames: number;
+    webRunIds: string[]; challengeToken?: string | null;
+  }): Promise<{
+    ok: boolean; reason?: string; id?: string;
+    foreignHooks?: number;
+    /** Токен виклику, ЯКЩО сервер зарахував цей ран як відповідь на нього. */
+    repliedTo?: string | null;
+  } | null> {
     return call('/api/run', { initData: telegram.initData(), ...run });
+  },
+
+  /** Створити виклик зі свого рану. Повертає токен і діп-лінк. */
+  async challenge(seed: number, runId: string): Promise<{ token: string; link: string; score: number } | null> {
+    const r = await call<{ ok: boolean; token: string; link: string; score: number }>(
+      '/api/challenge', { initData: telegram.initData(), seed, runId });
+    return r?.ok ? r : null;
+  },
+
+  /** Відкрити виклик за токеном із start_param. */
+  async openChallenge(token: string): Promise<{ seed: number; challengerId: number; score: number } | null> {
+    const r = await call<{ ok: boolean; seed: number; challengerId: number; score: number }>(
+      '/api/challenge/open', { initData: telegram.initData(), token });
+    return r?.ok ? r : null;
   },
 
   async event(name: string): Promise<void> {

@@ -4,6 +4,8 @@ import { validateInitData } from './auth.ts';
 import { verifyRun, type SubmittedRun } from './verify.ts';
 import { RunStore } from './store.ts';
 import { dailySeed, dayNumber } from './daily.ts';
+import { ChallengeStore } from './challenge.ts';
+import { computeMetrics } from './metrics.ts';
 
 /**
  * Бекенд прототипу (plan.md, 8.1).
@@ -20,7 +22,12 @@ const botToken = () => process.env.BOT_TOKEN ?? 'dev-token-not-a-real-bot';
 const devAllowUnsigned = () => process.env.DEV_ALLOW_UNSIGNED === '1';
 
 export const store = new RunStore();
+export const challenges = new ChallengeStore();
 const events: { name: string; at: number }[] = [];
+
+/** Ім'я бота для діп-лінків. Без токена лишається заглушкою. */
+const botName = () => process.env.BOT_NAME ?? 'pavutyna_bot';
+const appName = () => process.env.APP_NAME ?? 'play';
 
 type Session = { userId: number; chatId: string };
 
@@ -73,6 +80,10 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       const b = await readBody(req);
       const s = auth(b.initData as string | undefined);
       if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
+      // Перша поява користувача. Якщо він прийшов за викликом, походження
+      // вже записане в /api/challenge/open і перезаписати його не можна —
+      // інакше K-фактор рахувався б від неправильного знаменника.
+      challenges.seen(s.userId, 'organic');
       json(res, 200, { ok: true, userId: s.userId, chatId: s.chatId });
       return;
     }
@@ -117,8 +128,56 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
       const stored = store.add(s.chatId, {
         ownerId: s.userId, seed: run.seed, traceB64: run.traceB64,
         score: v.score, frames: v.frames, day: dayNumber(),
+        foreignHooks: v.foreignHooks,
       });
-      json(res, 200, { ok: true, id: stored.id, score: v.score });
+
+      // Якщо ран зіграно за викликом — це відповідь. Без цього зв'язку
+      // reply rate і K-фактор порахувати неможливо.
+      let repliedTo: string | null = null;
+      if (typeof b.challengeToken === 'string' && b.challengeToken) {
+        if (challenges.reply(b.challengeToken, s.userId, run.seed)) repliedTo = b.challengeToken;
+      }
+
+      json(res, 200, {
+        ok: true, id: stored.id, score: v.score,
+        foreignHooks: v.foreignHooks, repliedTo,
+      });
+      return;
+    }
+
+    if (path === '/api/challenge' && req.method === 'POST') {
+      const b = await readBody(req);
+      const s = auth(b.initData as string | undefined);
+      if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
+      const seed = Number(b.seed);
+      const runId = String(b.runId ?? '');
+      const mine = store.list(s.chatId, seed).find(r => r.id === runId && r.ownerId === s.userId);
+      if (!mine) { json(res, 400, { ok: false, reason: 'немає такого власного рану' }); return; }
+      const c = challenges.create(s.chatId, s.userId, seed, runId, mine.score);
+      json(res, 200, {
+        ok: true,
+        token: c.token,
+        score: c.score,
+        // Діп-лінк за форматом plan.md 8.2: startapp=<токен>
+        link: `https://t.me/${botName()}/${appName()}?startapp=${c.token}`,
+      });
+      return;
+    }
+
+    if (path === '/api/challenge/open' && req.method === 'POST') {
+      const b = await readBody(req);
+      const s = auth(b.initData as string | undefined);
+      if ('error' in s) { json(res, 401, { ok: false, reason: s.error }); return; }
+      const c = challenges.open(String(b.token ?? ''), s.userId);
+      if (!c) { json(res, 404, { ok: false, reason: 'виклик не знайдено' }); return; }
+      json(res, 200, {
+        ok: true, seed: c.seed, challengerId: c.ownerId, score: c.score, chatId: c.chatId,
+      });
+      return;
+    }
+
+    if (path === '/api/metrics' && req.method === 'GET') {
+      json(res, 200, computeMetrics(events, challenges, store.allRuns()));
       return;
     }
 

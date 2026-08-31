@@ -90,4 +90,4 @@ console.log('determinism');
 }
 
 console.log(failures === 0 ? '\nDETERMINISM OK' : `\nDETERMINISM FAILED: ${failures}`);
-process.exit(failures === 0 ? 0 : 1);
+process.exitCode = failures === 0 ? 0 : 1;
