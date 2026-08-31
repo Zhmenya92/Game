@@ -152,7 +152,11 @@ export class Simulation {
     const dt = BALANCE.dt;
     integrate(s, s.attached, s.ax, s.ay, s.ropeLen, this.baseSpeedNow());
 
-    s.killX += this.baseSpeedNow() * BALANCE.chaseSpeedScale * dt;
+    const chaseScale = Math.min(
+      BALANCE.chaseScaleMax,
+      BALANCE.chaseSpeedScale + s.frame * BALANCE.dt * BALANCE.chaseAccelPerSec,
+    );
+    s.killX += this.baseSpeedNow() * chaseScale * dt;
     s.frame += 1;
     const score = Math.floor(s.px / 10);
     if (score > s.score) s.score = score;

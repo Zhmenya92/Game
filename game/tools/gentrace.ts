@@ -6,7 +6,7 @@ import { Simulation } from '../src/sim/Simulation.ts';
 
 const seed = Number(process.argv[2] ?? 1);
 const prng = new Prng((seed ^ 0x5bf03635) >>> 0);
-const track = new Track(-1, [{ x: BALANCE.firstAnchor.x, y: BALANCE.firstAnchor.y }]);
+const track = new Track([{ x: BALANCE.firstAnchor.x, y: BALANCE.firstAnchor.y }]);
 const sim = new Simulation(seed, [], track);
 const s = sim.state;
 const REF = Math.sin((30 * Math.PI) / 180);

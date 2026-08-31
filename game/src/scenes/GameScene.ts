@@ -140,7 +140,7 @@ export class GameScene extends Phaser.Scene {
         if (this.trail.length > 26) this.trail.shift();
         if (!s.alive) { this.deadAt = this.time.now; this.cameras.main.shake(160, 0.012); break; }
       }
-    } else if (this.deadAt > 0 && this.time.now - this.deadAt > 900) {
+    } else if (this.deadAt > 0 && this.time.now - this.deadAt > BALANCE.restartDelayMs) {
       this.restart(this.seed);
     }
 
