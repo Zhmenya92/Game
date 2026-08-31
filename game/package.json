@@ -6,9 +6,9 @@
   "description": "Прототип 1 «Павутина» — grey-box тижня 1",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 8788",
-    "test": "node test/determinism.ts && node test/replay.ts && node test/server.ts && node test/challenge.ts && node test/fairness.ts",
+    "build": "node tools/makeAtlas.ts && vite build",
+    "preview": "node tools/preview.ts",
+    "test": "node test/determinism.ts && node test/replay.ts && node test/server.ts && node test/challenge.ts && node test/assets.ts && node test/fairness.ts",
     "test:determinism": "node test/determinism.ts",
     "test:fairness": "node test/fairness.ts",
     "sweep": "node tools/sweep3.ts",
@@ -17,7 +17,9 @@
     "test:human": "node test/humanPlayer.ts",
     "server": "node server/index.ts",
     "test:server": "node test/server.ts",
-    "test:challenge": "node test/challenge.ts"
+    "test:challenge": "node test/challenge.ts",
+    "atlas": "node tools/makeAtlas.ts",
+    "test:assets": "node test/assets.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

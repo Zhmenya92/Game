@@ -9,33 +9,33 @@ import { buildFromTraces } from '../sim/Web.ts';
 import { api, type RemoteRun } from '../net/api.ts';
 import { telegram } from '../net/telegram.ts';
 import type { Segment } from '../sim/types.ts';
+import { COL } from '../config/palette.ts';
+import { SpritePool } from '../render/SpritePool.ts';
+import * as S from '../render/scene.ts';
+import type { View } from '../render/scene.ts';
 
 /**
- * Рендер і джус. Арту немає й не повинно бути до тижня 5 — усе малюється кодом.
+ * Рендер і джус.
  *
- * Тиждень 2 додає дві речі з плану:
- *   • джус: squash & stretch, hit-stop, частинки, спалах, тряска, вібрація;
- *   • РІЙ НЕВДАЧ — усі спроби на цьому сіді програються одночасно.
- *     Прецедент — Multi-Play у Super Meat Boy. Це і є артефакт, який потім
- *     полетить у чат: він показує зусилля, а не число.
+ * Тиждень 2 дав джус (squash & stretch, hit-stop, частинки, спалах, тряска)
+ * і РІЙ НЕВДАЧ — усі спроби на сіді програються одночасно; прецедент —
+ * Multi-Play у Super Meat Boy.
+ *
+ * Тиждень 5 замінив негайне малювання `Graphics` на спрайти одного атласа
+ * (`tools/makeAtlas.ts`). Причина не косметична: кожна зміна стилю в
+ * `Graphics` скидає пакет WebGL, тобто коштує окремого виклику малювання, а
+ * технічний гейт плану — 1–2 виклики на сцену. Усе ігрове поле тепер іде
+ * однією текстурою.
  *
  * Симуляція нічого не знає ні про Phaser, ні про екран. Сцена тільки читає стан.
  */
 
-const COL = {
-  skyTop: 0x0a1420,
-  skyBottom: 0x16323a,
-  ground: 0x0a1a18,
-  anchor: 0x8fa8a4,
-  anchorLive: 0x4fd1bc,
-  rope: 0xffffff,
-  player: 0xffe9a8,
-  trail: 0xffd166,
-  ownWeb: 0xf0a24a,
-  foreignWeb: 0x4fd1bc,
-  chase: 0xd6455b,
-  ghost: 0x9fb4c7,
-};
+/** Зум камери й скільки світу він показує — потрібно для замощення.
+ *  Одна константа на обидва місця: розʼїхавшись, вони дали б смугу
+ *  незамощеного фону на краю екрана. */
+const ZOOM = 0.78;
+const VIEW_W = BALANCE.viewWidth / ZOOM;
+const VIEW_H = BALANCE.bandHeight / ZOOM;
 
 type Mode = 'play' | 'dead' | 'swarm';
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; c: number };
@@ -74,27 +74,48 @@ export class GameScene extends Phaser.Scene {
   private shareNote = '';
   private btnShare!: Phaser.GameObjects.Text;
 
+  private atlasError = '';
+  /** Гра не запустилась: симуляції немає, цикл не має чого крутити. */
+  private broken = false;
   private gSky!: Phaser.GameObjects.Graphics;
-  private gWeb!: Phaser.GameObjects.Graphics;
-  private gWorld!: Phaser.GameObjects.Graphics;
-  private gFlash!: Phaser.GameObjects.Graphics;
+  /** Чужа павутина не змінюється протягом рану — окремий пул, що не
+   *  перебудовується щокадру. */
+  private bg!: SpritePool;
+  private webPool!: SpritePool;
+  private world!: SpritePool;
   private txtScore!: Phaser.GameObjects.Text;
   private txtSub!: Phaser.GameObjects.Text;
   private txtHint!: Phaser.GameObjects.Text;
 
   constructor() { super('game'); }
 
+  preload(): void {
+    // Один атлас на всю гру. Формат Phaser «JSON Hash» — той самий, що видає
+    // TexturePacker, тож справжній арт ляже сюди без правок коду.
+    this.load.atlas('atlas', 'atlas.png', 'atlas.json');
+    // Без атласа кожен спрайт малюється зеленим квадратом-заглушкою, і екран
+    // виглядає зламаним без жодного повідомлення. Краще сказати прямо.
+    this.load.on('loaderror', (f: { key?: string }) => {
+      this.atlasError = `не завантажився ${f?.key ?? 'атлас'}`;
+    });
+  }
+
   create(): void {
     const w = BALANCE.viewWidth;
     const h = BALANCE.bandHeight;
 
-    this.gSky = this.add.graphics().setScrollFactor(0).setDepth(-10);
+    // Небо лишається `Graphics`: це один статичний прямокутник, який
+    // малюється раз і ніколи не перебудовується. Запікати градієнт у
+    // текстуру заради одного виклику малювання невигідно.
+    this.gSky = this.add.graphics().setScrollFactor(0).setDepth(-20);
     this.gSky.fillGradientStyle(COL.skyTop, COL.skyTop, COL.skyBottom, COL.skyBottom, 1);
     this.gSky.fillRect(-w, -h, w * 3, h * 3);
 
-    this.gWeb = this.add.graphics().setDepth(0);
-    this.gWorld = this.add.graphics().setDepth(1);
-    this.gFlash = this.add.graphics().setScrollFactor(0).setDepth(30);
+    // Два пули, обидва на одному атласі: доки між ними немає нічого з
+    // іншою текстурою, GPU бачить їх одним пакетом.
+    this.bg = new SpritePool(this, -10);
+    this.webPool = new SpritePool(this, 0);
+    this.world = new SpritePool(this, 1);
 
     this.txtScore = this.add.text(w / 2, 54, '0', {
       fontFamily: 'ui-monospace, "SF Mono", monospace', fontSize: '96px', color: '#ffffff',
@@ -128,7 +149,17 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keyup-SPACE', up);
     this.input.keyboard?.on('keydown-R', () => this.newSeed());
 
-    this.cameras.main.setZoom(0.78);
+    if (this.atlasError || !this.textures.exists('atlas')) {
+      // Далі йти немає сенсу: без текстури гра показала б порожні квадрати.
+      this.broken = true;
+      this.txtHint.setText(`АТЛАС НЕ ЗАВАНТАЖИВСЯ
+${this.atlasError || 'немає текстури atlas'}
+
+запустіть npm run atlas`);
+      return;
+    }
+
+    this.cameras.main.setZoom(ZOOM);
     telegram.init();
     this.restart(1);
     void this.connect();
@@ -270,15 +301,6 @@ export class GameScene extends Phaser.Scene {
     this.bakeWeb();
   }
 
-  private bakeWeb(): void {
-    this.gWeb.clear();
-    for (const s of this.foreignWeb) {
-      this.gWeb.lineStyle(BALANCE.lineVisualWidth + 2, COL.foreignWeb, 0.16);
-      this.gWeb.lineBetween(s.ax, s.ay, s.bx, s.by);
-      this.gWeb.lineStyle(BALANCE.lineVisualWidth, COL.foreignWeb, 0.5);
-      this.gWeb.lineBetween(s.ax, s.ay, s.bx, s.by);
-    }
-  }
 
   // ── Джус ──────────────────────────────────────────────────────────────
   private burst(x: number, y: number, n: number, color: number, power: number): void {
@@ -363,6 +385,7 @@ export class GameScene extends Phaser.Scene {
 
   // ── Цикл ──────────────────────────────────────────────────────────────
   update(_t: number, delta: number): void {
+    if (this.broken) return;          // симуляції не існує — крутити нічого
     const now = this.time.now;
 
     if (this.mode === 'swarm') {
@@ -428,111 +451,44 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ── Малювання ─────────────────────────────────────────────────────────
-  private drawWorld(g: Phaser.GameObjects.Graphics, camX: number, killX: number, frame: number): void {
-    const H = BALANCE.bandHeight;
-    g.fillStyle(COL.ground, 1);
-    g.fillRect(camX - 4000, H, 8000, 900);
-    g.lineStyle(5, 0x2b4a46, 1);
-    g.lineBetween(camX - 4000, H, camX + 4000, H);
+  //
+  // Сама розкладка живе в `render/scene.ts` і про Phaser не знає. Тут лише
+  // те, що без рушія неможливе: пули спрайтів, камера й текст HUD.
 
-    g.fillStyle(COL.chase, 0.22);
-    g.fillRect(killX - 3000, -2000, 3000, H + 4000);
-    g.lineStyle(8, COL.chase, 0.95);
-    g.lineBetween(killX, -2000, killX, H + 2000);
-    for (let i = 0; i < 14; i++) {
-      const y = -300 + i * 130 + ((frame * 2) % 130);
-      g.lineStyle(3, COL.chase, 0.35);
-      g.lineBetween(killX - 90, y, killX, y + 60);
-    }
+  private view(): View {
+    const cam = this.cameras.main;
+    return { camX: cam.scrollX, camY: cam.scrollY, w: VIEW_W, h: VIEW_H };
   }
 
-  private drawAnchors(g: Phaser.GameObjects.Graphics, sim: Simulation, live: ReturnType<typeof selectTarget>, frame: number): void {
-    const s = sim.state;
-    const from = s.px - 900, to = s.px + 1400;
-    for (const a of sim.track.anchors) {
-      if (a.x < from) continue;
-      if (a.x > to) break;
-      const isLive = !!live && live.kind === 'anchor' && live.x === a.x && live.y === a.y;
-      if (isLive) {
-        const pulse = 16 + Math.sin(frame * 0.12) * 4;
-        g.lineStyle(4, COL.anchorLive, 0.9);
-        g.strokeCircle(a.x, a.y, pulse + 10);
-      }
-      g.lineStyle(4, isLive ? COL.anchorLive : COL.anchor, isLive ? 1 : 0.75);
-      g.strokeCircle(a.x, a.y, 14);
-      g.fillStyle(isLive ? COL.anchorLive : COL.anchor, 1);
-      g.fillCircle(a.x, a.y, 6);
-    }
-  }
-
-  /** Squash & stretch: тіло витягується вздовж швидкості. Найдешевший джус. */
-  private drawBody(g: Phaser.GameObjects.Graphics, x: number, y: number, vx: number, vy: number, color: number, alpha: number, r = 15): void {
-    const sp = Math.sqrt(vx * vx + vy * vy);
-    const k = Math.min(0.55, sp / 1600);
-    const ang = Math.atan2(vy, vx);
-    g.save();
-    g.translateCanvas(x, y);
-    g.rotateCanvas(ang);
-    g.fillStyle(color, alpha);
-    g.fillEllipse(0, 0, r * 2 * (1 + k), r * 2 * (1 - k * 0.7));
-    g.restore();
-  }
-
-  private drawParticles(g: Phaser.GameObjects.Graphics): void {
-    for (const p of this.particles) {
-      const sz = 3 + p.life * 7;
-      g.fillStyle(p.c, Math.min(1, p.life));
-      g.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
-    }
+  /** Чужа павутина за рану не змінюється — розкладається раз на рестарті. */
+  private bakeWeb(): void {
+    this.webPool.begin();
+    S.drawForeignWeb(this.webPool, this.foreignWeb);
+    this.webPool.end();
   }
 
   private draw(): void {
     const s = this.sim.state;
-    const g = this.gWorld;
-    g.clear();
+    const p = this.world;
+    const v = this.view();
 
-    this.drawWorld(g, s.px, s.killX, s.frame);
+    this.bg.begin();
+    S.drawBackground(this.bg, v, s.killX, s.frame);
+    this.bg.end();
 
+    p.begin();
     const live = s.attached ? null
       : selectTarget(s.px, s.py, this.sim.track.candidates(s.px), this.foreignWeb.concat(this.sim.ownWeb));
-    this.drawAnchors(g, this.sim, live, s.frame);
-
-    for (const w of this.sim.ownWeb) {
-      g.lineStyle(BALANCE.lineVisualWidth + 3, COL.ownWeb, 0.14);
-      g.lineBetween(w.ax, w.ay, w.bx, w.by);
-      g.lineStyle(BALANCE.lineVisualWidth, COL.ownWeb, 0.8);
-      g.lineBetween(w.ax, w.ay, w.bx, w.by);
-    }
-
-    for (let i = 1; i < this.trail.length; i++) {
-      const a = this.trail[i - 1], b = this.trail[i];
-      const k = i / this.trail.length;
-      g.lineStyle(2 + k * 7, COL.trail, k * 0.5);
-      g.lineBetween(a.x, a.y, b.x, b.y);
-    }
-
-    if (s.attached) {
-      g.lineStyle(9, COL.rope, 0.25);
-      g.lineBetween(s.ax, s.ay, s.px, s.py);
-      g.lineStyle(4, COL.rope, 1);
-      g.lineBetween(s.ax, s.ay, s.px, s.py);
-      g.fillStyle(COL.anchorLive, 1);
-      g.fillCircle(s.ax, s.ay, 9);
-    } else if (live) {
-      const dx = live.x - s.px, dy = live.y - s.py, n = 9;
-      for (let i = 0; i < n; i += 2) {
-        g.lineStyle(3, COL.anchorLive, 0.5);
-        g.lineBetween(s.px + (dx * i) / n, s.py + (dy * i) / n,
-                      s.px + (dx * (i + 1)) / n, s.py + (dy * (i + 1)) / n);
-      }
-    }
-
-    g.fillStyle(0x000000, 0.25);
-    g.fillCircle(s.px, s.py + 4, 17);
-    this.drawBody(g, s.px, s.py, s.vx, s.vy, s.alive ? COL.player : COL.chase, 1);
-    this.drawParticles(g);
-
-    this.drawFlash();
+    S.drawAnchors(p, this.sim.track.anchors, s.px, live, s.frame);
+    S.drawOwnWeb(p, this.sim.ownWeb);
+    S.drawTrail(p, this.trail);
+    S.drawRope(p, s, live);
+    S.drawShadow(p, s.px, s.py);
+    S.drawBody(p, s.px, s.py, s.vx, s.vy, s.alive ? COL.player : COL.chase, 1);
+    S.drawParticles(p, this.particles);
+    S.drawFlash(p, v, this.flash);
+    this.flash *= 0.82;
+    p.end();
 
     if (s.score > this.best && this.mode === 'play') this.best = s.score;
     this.txtScore.setText(String(s.score));
@@ -547,8 +503,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawSwarm(): void {
-    const g = this.gWorld;
-    g.clear();
+    const p = this.world;
 
     // Камера йде за найдальшим із рою — це і є «переможець».
     let lead = this.swarm[0];
@@ -557,42 +512,38 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.scrollX = ls.px - (BALANCE.viewWidth / cam.zoom) * BALANCE.cameraPlayerX;
     cam.scrollY = ls.py - (BALANCE.bandHeight / cam.zoom) * 0.5;
+    const v = this.view();
 
-    this.drawWorld(g, ls.px, ls.killX, this.swarmFrame);
-    this.drawAnchors(g, lead.sim, null, this.swarmFrame);
+    this.bg.begin();
+    S.drawBackground(this.bg, v, ls.killX, this.swarmFrame);
+    this.bg.end();
+
+    p.begin();
+    S.drawAnchors(p, lead.sim.track.anchors, ls.px, null, this.swarmFrame);
 
     let died = 0;
     for (const t of this.swarm) {
       const st = t.sim.state;
       const isLead = t === lead;
       if (!st.alive) died++;
-
       if (st.attached) {
-        g.lineStyle(isLead ? 4 : 2, isLead ? COL.rope : COL.ghost, isLead ? 1 : 0.25);
-        g.lineBetween(st.ax, st.ay, st.px, st.py);
+        p.line(st.ax, st.ay, st.px, st.py, isLead ? 4 : 2,
+          isLead ? COL.rope : COL.ghost, isLead ? 1 : 0.25);
       }
-      this.drawBody(
-        g, st.px, st.py, st.vx, st.vy,
+      S.drawBody(p, st.px, st.py, st.vx, st.vy,
         !st.alive ? COL.chase : isLead ? COL.player : COL.ghost,
         !st.alive ? 0.35 : isLead ? 1 : 0.4,
-        isLead ? 15 : 11,
-      );
+        isLead ? 19 : 13);
     }
 
-    this.drawParticles(g);
-    this.drawFlash();
+    S.drawParticles(p, this.particles);
+    S.drawFlash(p, v, this.flash);
+    this.flash *= 0.82;
+    p.end();
 
     this.txtScore.setText(String(lead.attempt.score));
     this.txtSub.setText(`${this.swarm.length} спроб одночасно · загинуло ${died}`
       + (this.shareNote ? `  ·  ${this.shareNote}` : ''));
     this.txtHint.setText('НОВИЙ РЕКОРД\nусі твої спроби разом\n\nтапни, щоб грати');
-  }
-
-  private drawFlash(): void {
-    this.gFlash.clear();
-    if (this.flash <= 0.01) return;
-    this.gFlash.fillStyle(0xffffff, this.flash);
-    this.gFlash.fillRect(-200, -200, BALANCE.viewWidth + 400, BALANCE.bandHeight + 400);
-    this.flash *= 0.82;
   }
 }
