@@ -296,6 +296,18 @@
     font-variant-numeric:tabular-nums;
   }
 
+  code{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:.88em;
+    background:var(--surface-2);padding:1px 5px;border-radius:2px;color:var(--ink);
+  }
+  .pipe{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:12.5px;line-height:1.95;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;overflow-x:auto;white-space:pre;color:var(--muted);margin:0 0 14px;
+  }
+  .pipe b{color:var(--ink);font-weight:600;}
+  .pipe i{color:var(--accent);font-style:normal;}
+
   /* ---------- callout ---------- */
   .callout{
     border-left:2px solid var(--accent);padding:2px 0 2px 20px;margin:22px 0;
@@ -375,16 +387,19 @@
     <nav class="rail" aria-label="Розділи">
       <ol id="nav">
         <li><a href="#stan"><span class="n">01</span> Стан</a></li>
-        <li><a href="#ideya"><span class="n">02</span> Ідея</a></li>
-        <li><a href="#perevirka"><span class="n">03</span> Верифікація</a></li>
-        <li><a href="#konkurenty"><span class="n">04</span> Конкуренти</a></li>
-        <li><a href="#dyf"><span class="n">05</span> Диференціація</a></li>
-        <li><a href="#plan"><span class="n">06</span> Реалізація</a></li>
-        <li><a href="#heity"><span class="n">07</span> Гейти</a></li>
-        <li><a href="#hroshi"><span class="n">08</span> Економіка</a></li>
-        <li><a href="#ryzyky"><span class="n">09</span> Ризики</a></li>
-        <li><a href="#rish"><span class="n">10</span> Рішення</a></li>
-        <li><a href="#dzherela"><span class="n">11</span> Файли</a></li>
+        <li><a href="#rynok"><span class="n">02</span> Ринок</a></li>
+        <li><a href="#ideya"><span class="n">03</span> Ідея</a></li>
+        <li><a href="#perevirka"><span class="n">04</span> Верифікація</a></li>
+        <li><a href="#konkurenty"><span class="n">05</span> Конкуренти</a></li>
+        <li><a href="#dyf"><span class="n">06</span> Диференціація</a></li>
+        <li><a href="#tech"><span class="n">07</span> Технології</a></li>
+        <li><a href="#plan"><span class="n">08</span> Реалізація</a></li>
+        <li><a href="#heity"><span class="n">09</span> Гейти</a></li>
+        <li><a href="#viral"><span class="n">10</span> Віральність</a></li>
+        <li><a href="#hroshi"><span class="n">11</span> Економіка</a></li>
+        <li><a href="#ryzyky"><span class="n">12</span> Ризики</a></li>
+        <li><a href="#rish"><span class="n">13</span> Рішення</a></li>
+        <li><a href="#dzherela"><span class="n">14</span> Файли</a></li>
       </ol>
       <button class="themebtn" id="themebtn" type="button">Тема</button>
       <p class="rail-foot">Позначки достовірності наскрізні: якщо число не має «перевірено», воно не є підставою для рішення.</p>
@@ -435,8 +450,79 @@
       </section>
 
       <!-- 02 -->
+      <section id="rynok">
+        <div class="sec-head"><span class="n">02</span><h2>Ринок і вибір каналу</h2></div>
+        <p class="lede">Чи взагалі варто робити казуальну гру у 2026 — і де її запускати. Частина цих чисел із серпневого дослідження пізніше не витримала перевірки; вони лишаються тут із позначками, бо саме на них будувалося вихідне рішення.</p>
+
+        <h3>Погані новини</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Модель зламалася</span>
+            <p>Класичний hypercasual економічно не сходиться: CPI зростав швидше за eCPM, а ad-only модель не працює на низькоретеншеному інвентарі. eCPM casual Android rewarded: <strong>$3.60 → $3.25 → $3.02</strong> за два роки <span class="m m-as">Припущення</span> — останнє число першоджерелом не підтверджене.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Жанр став нішевим</span>
+            <p>Hypercasual — менш ніж <strong>$0.5 млрд</strong> in-app доходу проти $22 млрд у casual і $31 млрд у midcore. Це вже не золота лихоманка. <span class="m m-warn">Спірно</span> маркетингові агенції називають $17 млрд, бо рахують рекламний дохід і ширше визначення жанру.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Стори закрутили гайки</span>
+            <p>Google Play агресивно ріже «rehash existing apps», «thin wrappers» і низькоцінні AI-застосунки. Apple типово реджектить за minimal functionality — 4.3 spam.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Telegram теж просів</span>
+            <p>Гейм-категорія міні-апів <strong>−9 %</strong>: клікери й P2E видихлися. Це не зростаючий ринок із безкінечним припливом.</p>
+          </div>
+        </div>
+
+        <h3>Гарні новини</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Hybrid casual</span>
+            <p>Жанр-наступник: hypercasual-хук плюс мета-шар з IAP. Топові hybrid-тайтли дають <strong>LTV у 3–5 разів вище</strong> за чистий hypercasual. Voodoo, Homa, Supersonic, Azur індустріалізували мета-шаблони.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Telegram як канал</span>
+            <p>1 млрд MAU. D7 retention <strong>30–50 %</strong> для міні-апів проти 5–10 % у DApps. <span class="m m-bad">Спростовано</span> «500 млн взаємодій з міні-апами щодня» — це DAU Telegram у цілому, а міні-апи це 150–190 млн MAU.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">TikTok як відкриття</span>
+            <p><strong>75 % TikTok-геймерів</strong> знаходять нові ігри саме там; UGC-креативи обходять ad fatigue.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">AI зняв барʼєр</span>
+            <p>Понад <strong>−90 % часу</strong> на 2D-ассети. Головна перешкода соло-розробника більше не арт, а диференціація.</p>
+          </div>
+        </div>
+
+        <h3>Порівняння каналів</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Критерій</th><th>Telegram Mini App</th><th>App Store / Google Play</th><th>itch.io / веб</th></tr></thead>
+            <tbody>
+              <tr><td>Час до першого гравця</td><td><b>години</b></td><td>1–4 тижні: рев'ю + закрите тестування</td><td>години</td></tr>
+              <tr><td>Вартість входу</td><td class="num">0</td><td class="num">$99/рік Apple + $25 Google</td><td class="num">0</td></tr>
+              <tr><td>Вбудована віральність</td><td><b>дуже висока</b> — шер у чат, реферали</td><td>низька, тільки ASO і UA</td><td>немає</td></tr>
+              <tr><td>CPI <span class="m m-bad">Виправлено</span></td><td class="num">$0.50–2.00<span class="sub">у дослідженні було $0.10–0.50</span></td><td class="num">$2.50–6.00</td><td>—</td></tr>
+              <tr><td>Монетизація</td><td>Stars, Adsgram</td><td>AdMob / AppLovin / IAP — <b>вищі eCPM</b></td><td>~0</td></tr>
+              <tr><td>Ризик реджекту</td><td>мінімальний</td><td><b>високий</b> для простої гри</td><td>немає</td></tr>
+              <tr><td>Розмір білда</td><td><b>критично</b> — треба &lt; 5 МБ</td><td>не критично</td><td>не критично</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Висновок для стратегії</h3>
+        <p>Не будувати чистий hypercasual під платний UA — ця модель мертва для соло-розробника: CPI $0.50 у Tier-1 при ARPDAU $0.03–0.08 означає окупність за 6–16 днів при D7 12 %, тобто вона <b>не окупається</b>. Будувати органічно-віральну гру в Telegram, перевіряти ретеншен безкоштовно і лише після проходження гейтів пакувати у стори.</p>
+        <div class="pipe"><b>Тиждень 1–3</b>   MVP у Telegram Mini App — безкоштовно, швидко, віральна петля
+<b>Тиждень 4–5</b>   Заміри D1 / D7 / K-фактор на живих гравцях
+<i>Гейт</i>          D1 ≥ 30 % і K ≥ 0.35 ?
+   ├── <b>ТАК</b> →  Capacitor → Google Play closed testing → App Store
+   └── <b>НІ</b>  →  міняємо механіку або хук, повторюємо. Витрати ≈ 0</div>
+        <p style="font-size:13.5px;color:var(--muted);">Це ключова перевага міні-апу: ітерація коштує нуль і не спалює рев'ю-репутацію в сторах.</p>
+      </section>
+
+      <!-- 03 -->
       <section id="ideya">
-        <div class="sec-head"><span class="n">02</span><h2>Ідея</h2></div>
+        <div class="sec-head"><span class="n">03</span><h2>Ідея</h2></div>
         <p class="lede">Одна кнопка, дуга на тросі, і смерть, яка автоматично перетворюється на контент.</p>
 
         <div class="grid g3" style="margin-bottom:26px;">
@@ -473,6 +559,50 @@
         </div>
         <p style="margin-top:14px;"><b>Правило чесності:</b> жодної випадковості, що вбиває. Траса генерується з сіду, але кожна перешкода мусить бути проходимою з будь-якого валідного стану. Гравець має завжди сказати «я лоханувся», а не «гра підстава».</p>
 
+        <h3>Критерії, за якими обирали механіку</h3>
+        <ul class="plain">
+          <li>Пояснюється <b>без слів за 3 секунди</b> відео — instant clarity є базовою умовою віральності.</li>
+          <li>Керується <b>одним пальцем, однією дією</b>.</li>
+          <li><b>Чесна</b> — смерть завжди зрозуміла гравцю. Принцип Flappy Bird: однакова сила стрибка, однакова швидкість падіння, ти завжди знаєш, де помилився.</li>
+          <li>Дає <b>зростання скіла</b> — легко почати, важко освоїти.</li>
+          <li>Виробляє <b>артефакт для шерингу</b>.</li>
+        </ul>
+
+        <h3>Три кандидати, з яких обрано «Гак»</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Концепт</th><th>Керування</th><th>Чому віральний</th><th>Кадрів</th><th>Ризик</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="num"><b>A</b></td>
+                <td><b>Hook / Гак</b><span class="sub">Обрано</span></td>
+                <td>tap-hold-release</td>
+                <td>Момент «майже врізався» на швидкості — ідеальний кліп</td>
+                <td class="num">~6</td>
+                <td>ритм складніше налаштувати</td>
+              </tr>
+              <tr>
+                <td class="num">B</td><td>Flip / Двійник<span class="sub">два дзеркальні коридори</span></td><td>1 тап</td>
+                <td>Максимально читабельно у відео; «мозок ламається» на швидкості</td><td class="num">~4</td><td>близько до відомих клонів</td>
+              </tr>
+              <tr>
+                <td class="num">C</td><td>Ricochet / Стіни<span class="sub">стрибки між стінами вгору вежею</span></td><td>1 тап</td>
+                <td>Вертикальний формат — нативний під TikTok і Shorts</td><td class="num">~5</td><td>жанр перенасичений</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;">Обрано A: дає найкращу криву скіла — тайминг плюс довжина дуги, тобто два виміри майстерності при одній кнопці. Мінімум арту: герой 2–4 кадри, анкер 1, трос — це <code>Graphics.lineTo</code>, фон — градієнт.</p>
+
+        <h3>Мета-шар — той самий hybrid-casual, що дає ×3–5 LTV</h3>
+        <p>Мінімальний, не роздуваємо.</p>
+        <div class="grid g2">
+          <div class="card"><span class="kicker">Скіни героя</span><p>Тільки перефарбування tint плюс 1–2 унікальні. За Stars або за м'яку валюту.</p></div>
+          <div class="card"><span class="kicker">Щоденний челендж</span><p>Фіксований сід — усі грають однакову трасу, з чого виникають природні порівняння в чатах.</p></div>
+          <div class="card"><span class="kicker">Streak</span><p>Щоденна серія заходів.</p></div>
+          <div class="card"><span class="kicker">Continue за rewarded</span><p>Один раз за ран, тільки за вибором гравця.</p></div>
+        </div>
+
         <h3>Детермінізм — архітектурний центр, а не деталь</h3>
         <p>Одна технічна властивість дає чотири продуктові фічі одразу. Тому вона не обговорюється як опція.</p>
         <div class="scroll">
@@ -497,7 +627,7 @@
 
       <!-- 03 -->
       <section id="perevirka">
-        <div class="sec-head"><span class="n">03</span><h2>Верифікація дослідження</h2></div>
+        <div class="sec-head"><span class="n">04</span><h2>Верифікація дослідження</h2></div>
         <p class="lede">Вихідне дослідження від 23 серпня перевірено по первинних джерелах. Стратегічне ядро вистояло, чотири твердження — ні.</p>
 
         <h3>Що підтвердилося</h3>
@@ -560,11 +690,34 @@
           <li>Чи конвертує магазинчик — payer conversion у hybrid casual зазвичай 1–3 %, але наша невідома. <b>Тиждень 8+.</b></li>
           <li>Чи витримає Telegram-вебв'ю 60 FPS на дешевому Android. <b>Тиждень 1, на реальному пристрої.</b></li>
         </ul>
+
+        <h3>Що змінилося порівняно з вихідним дослідженням</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Було в дослідженні 23.08</th><th>Стало після перевірки</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Концепт «Гак» візуально унікальний</td><td><span class="m m-bad">Спростовано</span> Stickman Hook — 100 млн+, плюс Swing Loops 10 млн, Hanger 5 млн. Диференціація переїжджає в соціальний шар і привид-анкер</td></tr>
+              <tr><td class="num">2</td><td>500 млн щоденних взаємодій з міні-апами</td><td><span class="m m-bad">Спростовано</span> Це DAU Telegram у цілому. Міні-апи — 150–190 млн MAU після обвалу з піку 1.44 млрд</td></tr>
+              <tr><td class="num">3</td><td>CPI у Telegram $0.10–0.50</td><td><span class="m m-bad">Спростовано</span> $0.50–2.00</td></tr>
+              <tr><td class="num">4</td><td>ClipRecorder — клієнтський модуль</td><td><span class="m m-bad">Спростовано</span> Потребує бекенду: <code>savePreparedInlineMessage</code> серверний, <code>prepared_message_id</code> одноразовий, медіа треба хостити</td></tr>
+              <tr><td class="num">5</td><td>Telegram-інтеграція — тиждень 4</td><td>Тиждень 3–4 і це <b>ядро MVP</b>, бо це і є диференціація</td></tr>
+              <tr><td class="num">6</td><td>AI-арт — тиждень 3</td><td>Тиждень 5, після гейта диференціації</td></tr>
+              <tr><td class="num">7</td><td>Phaser 3/4</td><td>Phaser <b>4.2.x</b> — 4.1 стабільний з 30.04.2026</td></tr>
+              <tr><td class="num">8</td><td>eCPM Adsgram $0.35–0.50</td><td><span class="m m-warn">Спірно</span> Джерела розходяться в 15 разів. Планувати за нижнім, міряти емпірично</td></tr>
+              <tr><td class="num">9</td><td>eCPM у сторах $3.02</td><td><span class="m m-as">Припущення</span> У звіті Tenjin числа лише на графіках-зображеннях</td></tr>
+              <tr><td class="num">10</td><td>Stars — «нативна каса без комісій»</td><td>30 % Apple / Google на мобільних купівлях → ~$0.009 за Star, мінімум виводу 1 000, холд 21 день, обов'язковий <code>/paysupport</code></td></tr>
+              <tr><td class="num">11</td><td>14 днів closed testing</td><td><b>12 тестувальників × 14 днів</b>, тільки для персональних акаунтів після 13.11.2023; юрособи звільнені</td></tr>
+              <tr><td class="num">12</td><td>Детермінізм не згадувався</td><td>Доданий як архітектурне ядро: дає кліпи, привидів, чесний челендж і античит одним механізмом</td></tr>
+              <tr><td class="num">13</td><td>Конкуренти — лише ігри з тією самою механікою</td><td><span class="m m-emp">31.08</span> Конкурентних кіл три; коло каналу (Telegram, GAMEE, PlayDeck) не існувало в плані взагалі</td></tr>
+              <tr><td class="num">14</td><td>Соціального шару достатньо для диференціації</td><td><span class="m m-emp">31.08</span> Недостатньо — додається привид як фізичний об'єкт</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- 04 -->
       <section id="konkurenty">
-        <div class="sec-head"><span class="n">04</span><h2>Конкуренти</h2></div>
+        <div class="sec-head"><span class="n">05</span><h2>Конкуренти</h2></div>
         <p class="lede">Конкурентних кіл три, і диференціюватися треба від усіх одночасно. Кола «канал» у першій версії плану не існувало взагалі — це головна знахідка розвідки.</p>
 
         <div class="grid g3" style="margin-bottom:30px;">
@@ -701,7 +854,7 @@
 
       <!-- 05 -->
       <section id="dyf">
-        <div class="sec-head"><span class="n">05</span><h2>Диференціація</h2></div>
+        <div class="sec-head"><span class="n">06</span><h2>Диференціація</h2></div>
         <p class="lede">Соціальний шар прийнято як напрям, але його замало. Шість кандидатів на другий елемент, зважені за шістьма критеріями.</p>
 
         <h3>Критерії</h3>
@@ -830,9 +983,143 @@
         <p style="margin-top:14px;">Якщо жоден варіант не дає читабельного, приємного зачеплення за 6 днів — повертаємось до кандидата E і визнаємо, що диференціації рівня 4.3 у нас немає. Це нормальний результат ціною тижня.</p>
       </section>
 
-      <!-- 06 -->
+      <!-- 07 -->
+      <section id="tech">
+        <div class="sec-head"><span class="n">07</span><h2>Технології</h2></div>
+        <p class="lede">Рушій, формат анімації і AI-пайплайн. Головна теза розділу: <b>анімація трансформаціями, а не кадрами</b> — дешевше, легше, надійніше і не залежить від якості AI-генерації.</p>
+
+        <h3>Вибір рушія</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Рушій</th><th>Мова</th><th>Веб і Telegram</th><th>Розмір мобільного білда</th><th>Реклама</th><th>Вердикт</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Phaser 4.2.x</b></td><td>TypeScript</td>
+                <td><b>ідеально</b> — 1–2 МБ, миттєвий старт</td><td>через Capacitor</td>
+                <td>AdMob через Capacitor-плагіни</td><td><b>основний вибір</b></td>
+              </tr>
+              <tr>
+                <td>Godot 4.x</td><td>GDScript</td>
+                <td>посередньо: тільки Compatibility / WebGL2, ліміт WASM-пам'яті, баги iOS Safari, потрібні COOP/COEP-хедери</td>
+                <td class="num">15–25 МБ</td><td>зрілі плагіни, медіація до 15 мереж</td><td>план Б, якщо йдемо нативно</td>
+              </tr>
+              <tr>
+                <td>Defold</td><td>Lua</td><td>добре</td><td class="num">4–6 МБ<span class="sub">мінімум до ~1.6 МБ</span></td>
+                <td>є, але екосистема менша</td><td>найкращий, якщо критичний розмір APK</td>
+              </tr>
+              <tr>
+                <td>Unity</td><td>C#</td><td>важкий веб</td><td class="num">40+ МБ</td>
+                <td>найкраща ад-екосистема, ~48 % ринку</td><td>надлишок для однієї кнопки</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="plain" style="margin-top:16px;">
+          <li><b>Telegram карає за вагу.</b> Потрібен старт за &lt; 2 с на середньому Android у вебв'ю. Godot WASM цього надійно не дає.</li>
+          <li><b>Один код — обидві цілі.</b> Той самий білд працює як міні-ап і як нативний застосунок через Capacitor.</li>
+          <li><b>AI-ассети інтегруються тривіально:</b> JSON-атлас вантажиться одним рядком.</li>
+          <li><b>Ризик:</b> Phaser не дає нативного перформансу — але одній кнопці й тридцяти спрайтам він і не потрібен.</li>
+          <li>Якщо все ж хочеться Godot — цільтеся одразу в нативні стори і забудьте про Telegram як основний канал. Змішати без болю не вийде.</li>
+        </ul>
+
+        <h3>Чому GIF не можна у рантаймі</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Властивість формату</th><th>Наслідок у грі</th></tr></thead>
+            <tbody>
+              <tr><td>256 кольорів, палітра</td><td>Градієнти й м'які тіні розсипаються в бендинг</td></tr>
+              <tr><td><b>1-бітна прозорість</b></td><td>Брудна облямівка по контуру спрайта на будь-якому фоні</td></tr>
+              <tr><td>Кожна гіфка — окрема текстура</td><td>+1 <b>draw call</b> на кожен об'єкт; 50 текстур = 50+ draw calls на кадр</td></tr>
+              <tr><td>CPU-декодування покадрово</td><td>Джанк на слабких Android</td></tr>
+              <tr><td>Немає контролю над таймінгом</td><td>Не можна синхронізувати з фізикою</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;"><b>Правильний рантайм-формат:</b> PNG або WebP sprite atlas плюс JSON. Один атлас 2048×2048 вистачає на всю гру такого масштабу і дає <b>1–2 draw calls замість 50+</b>, менше пам'яті й одне HTTP-завантаження — критично для мобільної мережі. GIF лишається корисним у двох місцях: як проміжний формат AI-пайплайну і як формат кліпу для шерингу.</p>
+
+        <h3>Бюджет анімації: 8–12 кадрів на всю гру</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Об'єкт</th><th>Кадрів</th><th>Як «оживає»</th></tr></thead>
+            <tbody>
+              <tr><td>Герой</td><td class="num">2–4</td><td>Rotation за вектором швидкості + squash &amp; stretch на скейлі</td></tr>
+              <tr><td>Анкер і перешкоди</td><td class="num">1</td><td>Повільний sin-дрейф позиції й повороту через tween</td></tr>
+              <tr><td>Фон</td><td class="num">2–3 шари</td><td>Parallax-скрол, нуль кадрів</td></tr>
+              <tr><td>Підбираний об'єкт</td><td class="num">1</td><td>Обертання + пульсація scale + tint</td></tr>
+              <tr><td>Смерть і вибух</td><td class="num"><b>0</b></td><td>Particle emitter + flash + screenshake</td></tr>
+              <tr><td>UI</td><td class="num"><b>0</b></td><td>Tween-easing на появу й зникнення</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>«Джус» без жодного намальованого кадру</h3>
+        <p>Це те, що робить гру дорогою на вигляд при восьми кадрах арту. Порядок — за співвідношенням ефекту до зусиль.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Прийом</th><th>Параметри</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td><b>Squash &amp; stretch</b></td><td>Стиснення на приземленні, розтяг на дузі. Найсильніший ефект на одиницю зусиль</td></tr>
+              <tr><td class="num">2</td><td><b>Screenshake</b></td><td class="num">80–150 мс, мала амплітуда<span class="sub">гравець не помічає свідомо, але відчуває постійно</span></td></tr>
+              <tr><td class="num">3</td><td><b>Hit-stop</b></td><td class="num">40–80 мс паузи на зіткненні</td></tr>
+              <tr><td class="num">4</td><td>Частинки</td><td class="num">8–15 квадратиків замість намальованого вибуху</td></tr>
+              <tr><td class="num">5</td><td>Tint-flash</td><td class="num">білий спалах 60 мс</td></tr>
+              <tr><td class="num">6</td><td>Sin/cos-рух</td><td>Плаваючі об'єкти, «дихання» перешкод, погойдування UI</td></tr>
+              <tr><td class="num">7</td><td>Easing на всьому</td><td><code>Back.easeOut</code> на появі елементів UI</td></tr>
+              <tr><td class="num">8</td><td>Звук на кожну подію</td><td>Дослідження оцінює внесок аудіо в «соковитість» у 60 % <span class="m m-as">Припущення</span> — перевіряється вимкненням звуку на тестувальниках. Плюс <code>HapticFeedback</code>, безкоштовний усередині Telegram</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>AI-пайплайн генерації ассетів</h3>
+        <div class="pipe"><b>[1]</b> Style bible      → Nano Banana Pro / Midjourney / Flux
+                        1 еталонне зображення, фіксує стиль назавжди
+<b>[2]</b> Персонаж/об'єкти → Nano Banana Pro (character sheet) або Scenario
+                        прозорий PNG 512×512, 2–5 с на ассет
+<b>[3]</b> Кадри анімації   → PixelLab (піксель) АБО Kling / Wan (image→video)
+<b>[4]</b> Витяг + альфа    → ffmpeg → rembg / BiRefNet
+<i>[5]</i> <i>РУЧНИЙ прохід</i>    → Aseprite / Photopea: вирівнювання pivot, квантизація
+                        ⚠ найважливіший і найручніший крок
+<b>[6]</b> Пакування        → TexturePacker / free-tex-packer → atlas.png + atlas.json
+<b>[7]</b> Аудіо            → ElevenLabs SFX + Suno → аудіоспрайт</div>
+
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Інструмент</th><th>Що робить</th><th>Ціна</th><th>Коли брати</th></tr></thead>
+            <tbody>
+              <tr><td><b>Nano Banana Pro</b><span class="sub">Google / Gemini</span></td><td>Статичні ассети, character sheets, ~93 % консистентності персонажа, прозорий PNG, 2–5 с на 512×512</td><td>за API або підписку Gemini</td><td><b>База для не-піксельного стилю</b></td></tr>
+              <tr><td>Scenario.gg</td><td>Тренування власного стилю — усі ассети в одному вигляді</td><td>підписка</td><td>Якщо треба 50+ ассетів в єдиному стилі</td></tr>
+              <tr><td>PixelLab.ai</td><td>Піксель-арт: 4/8 напрямків, skeleton- і text-to-animation, експорт спрайтшита</td><td>підписка</td><td>Якщо стиль — піксель-арт</td></tr>
+              <tr><td>Retro Diffusion</td><td>Піксель-арт + <code>rd-animation</code>, розширення для Aseprite</td><td class="num">~1¢ / зображення<span class="sub">анімація ≈10 кредитів; екстеншн $65 full / $20 lite</span></td><td>Найчистіша піксельна база</td></tr>
+              <tr><td>Ludo.ai Sprite Generator</td><td>30+ стилів, готові аркуші з atlas-даними</td><td>підписка</td><td>Швидкий чорновий пайплайн</td></tr>
+              <tr><td>Kling / Wan / Sora</td><td>Оживлення статичного персонажа у відео</td><td>покадрова оплата</td><td>Для «мультяшних» рухів</td></tr>
+              <tr><td>rembg / BiRefNet</td><td>Зняття фону покадрово, альфа</td><td>free / freemium</td><td><b>Обов'язковий крок після відео</b></td></tr>
+              <tr><td>ElevenLabs SFX / Suno</td><td>Звуки й музика</td><td>freemium</td><td>Останній тиждень розробки</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:12.5px;color:var(--faint);margin-top:10px;">Ціни цих інструментів незалежно не перевірялися <span class="m m-as">Припущення</span> — звірити перед закупівлею.</p>
+
+        <h3>П'ять застережень, які не є опційними</h3>
+        <ul class="plain">
+          <li><b>AI-кадри «плавають».</b> Силует не тримає ту саму позицію в клітинці між кадрами; зсув на 2 пікселі читається як судоми. Ручний прохід вирівнювання pivot — це те, що відрізняє робочий аркуш від сміття. Автоматика поки не дотягує.</li>
+          <li><b>Тому й обираємо мінімум кадрів.</b> 2 кадри плюс tween завжди виглядають краще за 8 кривих AI-кадрів. Мінімалізм тут — страховка, а не лінь.</li>
+          <li><b>Ліцензії перевірити до фінальної генерації.</b> У низці тарифів комерційне використання заборонене. Зафіксувати умови скриншотом на дату генерації.</li>
+          <li><b>Google Play з 2026 окремо ріже низькоцінні AI-застосунки.</b> AI-арт сам по собі не рятує; рятує власна механіка й полірування.</li>
+          <li><b>Не генерувати те, що малюється кодом.</b> Градієнтний фон, частинки, UI — це <code>Graphics</code>, а не PNG. І легше, і масштабується під будь-який екран.</li>
+        </ul>
+
+        <h3>Технічні гейти арту</h3>
+        <div class="grid g2">
+          <div class="card"><div class="stat"><span class="v">≤ 500 КБ</span><span class="k">один атлас, не більше 2048×2048</span></div></div>
+          <div class="card"><div class="stat"><span class="v">≤ 3 МБ</span><span class="k">увесь білд у gzip</span></div></div>
+          <div class="card"><div class="stat"><span class="v">≤ 2 с</span><span class="k">до першого кадру на 4G і середньому Android</span></div></div>
+          <div class="card"><div class="stat"><span class="v">1–2</span><span class="k">draw call на сцену</span></div></div>
+        </div>
+      </section>
+
+      <!-- 08 -->
       <section id="plan">
-        <div class="sec-head"><span class="n">06</span><h2>Реалізація</h2></div>
+        <div class="sec-head"><span class="n">08</span><h2>Реалізація</h2></div>
         <p class="lede">Порядок фаз змінено проти вихідного дослідження: диференціація перевіряється <b>до</b> арту. Якщо соціальна петля не працює, гарний арт її не врятує.</p>
 
         <div class="tl">
@@ -898,6 +1185,29 @@
           </div>
         </div>
 
+        <h3>Задача 0.2 — spike шерингу, найризикованіша невідома проєкту</h3>
+        <p>Мета: довести, що кліп, згенерований у браузері, реально долітає в чат Telegram <b>і анімується там</b>, а не показується статичним кадром. Ланцюг: бот через BotFather з інлайн-режимом → мінімальний Mini App → <code>gif.js</code> у Web Worker → заливка в Cloudflare R2 → <code>savePreparedInlineMessage</code> з <code>InlineQueryResultGif</code> → <code>WebApp.shareMessage</code>.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Що виміряти</th><th>Чому це важливо</th></tr></thead>
+            <tbody>
+              <tr><td>Чи приймає <code>InlineQueryResultGif</code> зовнішній URL</td><td>Визначає, чи потрібен проміжний upload через <code>sendAnimation</code></td></tr>
+              <tr><td><b>Ліміт розміру</b> файлу для інлайн-результату</td><td>Визначає роздільну здатність і тривалість кліпу</td></tr>
+              <tr><td><code>expire_date</code> у <code>PreparedInlineMessage</code></td><td>Скільки часу є в гравця на тап «Поділитися»</td></tr>
+              <tr><td>Час кодування на <b>реальному дешевому Android</b></td><td>Дослідження припускає 300–600 мс. Якщо буде 3 с — фічу треба переробляти</td></tr>
+              <tr><td>Поведінка на iOS у WKWebView</td><td>Головний ризик за розділом про MediaRecorder</td></tr>
+              <tr><td>Чи працює <code>startapp</code> і чи приходить у <code>initData.start_param</code></td><td>Без цього немає ні привида, ні атрибуції рефералів, ні K-фактора</td></tr>
+              <tr><td>Чи валідується <code>initData</code> через HMAC із токеном бота</td><td>Без цього лідерборд і рахунки не захищені</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;"><b>Критерій успіху:</b> GIF анімується в чаті, кодується менш ніж за секунду на бюджетному Android, <code>start_param</code> доходить.</p>
+        <div class="grid g2">
+          <div class="card"><span class="kicker">План Б</span><p>Статична PNG «скор-картка» замість GIF — набагато легша, гарантовано працює як <code>InlineQueryResultPhoto</code>. Анімація тоді живе тільки в <code>shareToStory</code>.</p></div>
+          <div class="card"><span class="kicker">План В</span><p>Взагалі без медіа — <code>switchInlineQuery</code> з текстом і посиланням. Найгірший варіант: петля слабшає, але працює скрізь, зокрема на клієнтах із Bot API нижче 8.0.</p></div>
+        </div>
+        <p style="font-size:13.5px;color:var(--muted);margin-top:10px;">Рішення про формат кліпу ухвалюється <b>за результатом spike</b>. Планувати GIF як доконаний факт — це саме той тип вигадки, якого документ уникає.</p>
+
         <h3>Архітектура</h3>
         <div class="grid g2">
           <div class="card">
@@ -913,7 +1223,7 @@
 
       <!-- 07 -->
       <section id="heity">
-        <div class="sec-head"><span class="n">07</span><h2>Гейти</h2></div>
+        <div class="sec-head"><span class="n">09</span><h2>Гейти</h2></div>
         <p class="lede">Чотири точки, у яких проєкт або продовжується, або чесно закривається. Чекбокси зберігаються у вашому браузері.</p>
 
         <div class="grid g2">
@@ -977,9 +1287,66 @@
         </div>
       </section>
 
-      <!-- 08 -->
+      <!-- 10 -->
+      <section id="viral">
+        <div class="sec-head"><span class="n">10</span><h2>Віральність</h2></div>
+        <p class="lede">Три петлі, які треба закодити, а не «зробити потім». Плюс те, що вимірює, чи вони працюють.</p>
+
+        <h3>Петля 1 — шер у Telegram</h3>
+        <div class="pipe">Гравець програє
+   → останні 3 с реплеяться в slow-mo 0.25×
+   → кнопка «<b>Кинути виклик</b>»
+   → у чат летить: кліп 3 с + рахунок + діп-лінк <i>t.me/&lt;bot&gt;/&lt;app&gt;?startapp=&lt;seed&gt;_&lt;challengerId&gt;</i>
+   → друг відкриває, грає <b>ту саму трасу</b>, бачить <b>привид</b> першого гравця
+   → його результат автоматично летить назад у той самий чат
+   → перший гравець отримує пуш «тебе обійшли»</div>
+        <ul class="plain">
+          <li>На кожен тап «Поділитися» потрібен <b>новий серверний виклик</b> — <code>prepared_message_id</code> одноразовий.</li>
+          <li>Реферал винагороджує <b>обох</b> — модель Notcoin.</li>
+          <li>Клієнти з Bot API нижче 8.0 не мають <code>shareMessage</code>: визначати версію через <code>WebApp.version</code> і падати на <code>switchInlineQuery</code>.</li>
+          <li>Паралельно <code>shareToStory</code> як другий канал — потребує лише публічний URL, дешево додати.</li>
+        </ul>
+
+        <h3>Петля 2 — кліп для TikTok і Shorts</h3>
+        <p>Вертикальний формат 9:16, нативний для платформи; кліп смерті експортується готовим до заливки. Гра має бути читабельною <b>без звуку і без пояснень</b> — це та сама вимога instant clarity, що й у критеріях механіки.</p>
+
+        <h3>Петля 3 — щоденний челендж</h3>
+        <p>Єдиний сід дня для всіх, таблиця друзів у чаті, <b>не глобальна</b>. Глобальний лідерборд на старті не робимо: читери з'їдять мотивацію. Це та сама механіка, що дала Wordle спільний ритуал — і саме вона робить порівняння в чаті чесним.</p>
+
+        <h3>Контент-стратегія</h3>
+        <ul class="plain">
+          <li><b>UGC-стиль замість продакшену.</b> Реакційні відео від мікро-креаторів виглядають нативно і не вигорають, як полірована реклама. Тренд 2026 — сотні мікроінфлюенсерів замість одного макро.</li>
+          <li><b>Спершу органіка знаходить хук</b>, і лише потім — якщо взагалі — під переможні креативи ставиться бюджет.</li>
+          <li><b>Візуальний хук:</b> відео мають показувати нагороджувальні дії — комбо, несподіваний результат, чіткий візуальний фідбек.</li>
+          <li><b>Тестувати 10–20 варіантів першого кадру</b> — перші 1.5 секунди вирішують долю ролика.</li>
+        </ul>
+
+        <h3>Що не робити</h3>
+        <div class="grid g3">
+          <div class="card"><span class="kicker">Нейминг</span><p>Не називати гру «Hook щось», «Stickman щось», «Swing щось». Це і ASO-шум, і прямий шлях до реджекту 4.3.</p></div>
+          <div class="card"><span class="kicker">Трафік</span><p>Не запускати платний UA до підтвердженого D7. А в Telegram він і недоступний — вхід від €2 млн.</p></div>
+          <div class="card"><span class="kicker">Лідерборд</span><p>Не робити глобальний рейтинг на старті. Тільки друзі й чат.</p></div>
+        </div>
+
+        <h3>Аналітика — мінімальний набір подій</h3>
+        <p>Без цього гейти неможливо порахувати. Пишемо у власний <code>POST /event</code>: бекенд усе одно є, а третя сторона додає вартість і ризик блокування.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Група</th><th>Події</th></tr></thead>
+            <tbody>
+              <tr><td>Сесія і ран</td><td><code>app_open</code> · <code>run_start</code> · <code>run_end</code> <span class="sub">рахунок, тривалість, причина смерті</span></td></tr>
+              <tr><td>Віральна петля</td><td><code>share_click</code> · <code>share_sent</code> · <code>challenge_opened</code> <span class="sub">з start_param</span> · <code>challenge_replied</code> · <code>ghost_beaten</code></td></tr>
+              <tr><td>Монетизація</td><td><code>ad_offer</code> · <code>ad_watched</code> · <code>iap_open</code> · <code>iap_purchased</code></td></tr>
+              <tr><td>Утримання</td><td><code>day_streak</code></td></tr>
+              <tr><td>Диференціація <span class="m m-emp">Нове</span></td><td><code>ghost_hooked</code> <span class="sub">без цієї події ghost-hook rate не порахувати, а це головна метрика гейта 3</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 11 -->
       <section id="hroshi">
-        <div class="sec-head"><span class="n">08</span><h2>Економіка</h2></div>
+        <div class="sec-head"><span class="n">11</span><h2>Економіка</h2></div>
         <p class="lede">Telegram-фаза — це не спосіб заробити. Це спосіб безкоштовно з'ясувати, чи гра комусь потрібна.</p>
 
         <div class="grid g3" style="margin-bottom:26px;">
@@ -1026,7 +1393,7 @@
 
       <!-- 09 -->
       <section id="ryzyky">
-        <div class="sec-head"><span class="n">09</span><h2>Ризики</h2></div>
+        <div class="sec-head"><span class="n">12</span><h2>Ризики</h2></div>
         <p class="lede">Кожен ризик має місце, де ми його ловимо. Ризик без такого місця — це не ризик, а тривога.</p>
         <div class="scroll">
           <table>
@@ -1052,7 +1419,7 @@
 
       <!-- 10 -->
       <section id="rish">
-        <div class="sec-head"><span class="n">10</span><h2>Рішення</h2></div>
+        <div class="sec-head"><span class="n">13</span><h2>Рішення</h2></div>
         <div class="scroll">
           <table>
             <thead><tr><th style="width:34px">#</th><th>Питання</th><th>Стан</th></tr></thead>
@@ -1070,7 +1437,7 @@
 
       <!-- 11 -->
       <section id="dzherela">
-        <div class="sec-head"><span class="n">11</span><h2>Файли і джерела</h2></div>
+        <div class="sec-head"><span class="n">14</span><h2>Файли і джерела</h2></div>
 
         <h3>Документи проєкту</h3>
         <div class="files">
