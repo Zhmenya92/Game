@@ -1,0 +1,1293 @@
+<title>Штаб проєкту Гак</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#edf0ef;
+    --surface:#fbfcfc;
+    --surface-2:#e4e9e7;
+    --ink:#0d1614;
+    --muted:#55635f;
+    --faint:#7d8a86;
+    --line:#cdd6d3;
+    --line-soft:#dee5e3;
+    --accent:#0f5c52;
+    --accent-ink:#0a3d36;
+    --accent-soft:#dceae7;
+    --ok:#0f5c52;      --ok-bg:#dceae7;
+    --warn:#8a5a0b;    --warn-bg:#f3e7cf;
+    --bad:#9b2c2c;     --bad-bg:#f3dcdc;
+    --emp:#2c4a7c;     --emp-bg:#dde5f1;
+    --assume:#5f6a6d;  --assume-bg:#e2e6e6;
+    --shadow:0 1px 2px rgba(13,22,20,.06), 0 8px 24px -18px rgba(13,22,20,.4);
+    --radius:4px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b100f;
+      --surface:#131a19;
+      --surface-2:#1a2321;
+      --ink:#e6edeb;
+      --muted:#95a5a0;
+      --faint:#71827d;
+      --line:#26302e;
+      --line-soft:#1e2725;
+      --accent:#4fd1bc;
+      --accent-ink:#8ee5d6;
+      --accent-soft:#14302c;
+      --ok:#4fd1bc;      --ok-bg:#14302c;
+      --warn:#d3a44f;    --warn-bg:#332813;
+      --bad:#e08585;     --bad-bg:#361f1f;
+      --emp:#8fb0e0;     --emp-bg:#182333;
+      --assume:#93a09f;  --assume-bg:#212927;
+      --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b100f;
+    --surface:#131a19;
+    --surface-2:#1a2321;
+    --ink:#e6edeb;
+    --muted:#95a5a0;
+    --faint:#71827d;
+    --line:#26302e;
+    --line-soft:#1e2725;
+    --accent:#4fd1bc;
+    --accent-ink:#8ee5d6;
+    --accent-soft:#14302c;
+    --ok:#4fd1bc;      --ok-bg:#14302c;
+    --warn:#d3a44f;    --warn-bg:#332813;
+    --bad:#e08585;     --bad-bg:#361f1f;
+    --emp:#8fb0e0;     --emp-bg:#182333;
+    --assume:#93a09f;  --assume-bg:#212927;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -18px rgba(0,0,0,.9);
+  }
+
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent-soft);color:var(--accent-ink);}
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid var(--line);}
+  a:hover{border-bottom-color:var(--accent);}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* ---------- shell ---------- */
+  .shell{max-width:1180px;margin:0 auto;padding:0 24px 96px;}
+  .cols{display:grid;grid-template-columns:210px minmax(0,1fr);gap:56px;align-items:start;}
+  @media (max-width:900px){ .cols{grid-template-columns:1fr;gap:0;} }
+
+  /* ---------- masthead ---------- */
+  .mast{position:relative;padding:56px 0 28px;border-bottom:1px solid var(--line);margin-bottom:40px;overflow:hidden;}
+  .mast canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;}
+  .mast-inner{position:relative;}
+  .eyebrow{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+    display:flex;flex-wrap:wrap;gap:6px 18px;
+  }
+  h1{
+    font-family:"IBM Plex Serif", Georgia, serif;
+    font-weight:600;font-size:clamp(34px,5.2vw,52px);line-height:1.04;
+    letter-spacing:-.02em;margin:14px 0 0;text-wrap:balance;max-width:16ch;
+  }
+  .thesis{
+    font-family:"IBM Plex Serif", Georgia, serif;
+    font-size:clamp(17px,2vw,20px);line-height:1.5;color:var(--muted);
+    max-width:56ch;margin:18px 0 0;text-wrap:balance;
+  }
+  .thesis b{color:var(--ink);font-weight:600;}
+  .mast-meta{
+    display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:26px;
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:12px;color:var(--faint);
+  }
+  .mast-meta span b{color:var(--muted);font-weight:500;}
+  .capt{
+    margin-top:22px;font-size:11.5px;color:var(--faint);max-width:46ch;line-height:1.5;
+    padding-left:11px;border-left:1px solid var(--line);
+  }
+
+  /* ---------- nav ---------- */
+  nav.rail{position:sticky;top:20px;padding-top:4px;}
+  @media (max-width:900px){
+    nav.rail{position:static;margin-bottom:36px;padding-bottom:20px;border-bottom:1px solid var(--line);}
+    nav.rail ol{display:flex;flex-wrap:wrap;gap:4px 6px;}
+  }
+  nav.rail ol{list-style:none;display:flex;flex-direction:column;gap:1px;}
+  nav.rail a{
+    display:flex;gap:9px;align-items:baseline;
+    font-size:13px;color:var(--muted);border:0;padding:5px 9px;border-radius:var(--radius);
+    transition:color .15s, background .15s;
+  }
+  nav.rail a .n{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:10.5px;color:var(--faint);
+    font-variant-numeric:tabular-nums;
+  }
+  nav.rail a:hover{background:var(--surface-2);color:var(--ink);}
+  nav.rail a.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600;}
+  nav.rail a.on .n{color:var(--accent);}
+  .rail-foot{margin-top:20px;padding:0 9px;font-size:11.5px;color:var(--faint);line-height:1.5;}
+  .themebtn{
+    margin:14px 0 0 9px;background:var(--surface);border:1px solid var(--line);color:var(--muted);
+    font:500 11.5px/1 "IBM Plex Mono", ui-monospace, monospace;
+    padding:7px 10px;border-radius:var(--radius);cursor:pointer;letter-spacing:.06em;
+  }
+  .themebtn:hover{border-color:var(--accent);color:var(--accent-ink);}
+
+  /* ---------- sections ---------- */
+  section{scroll-margin-top:20px;padding-top:8px;}
+  section + section{margin-top:64px;}
+  .sec-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:26px;}
+  .sec-head .n{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:11px;color:var(--accent);
+    letter-spacing:.14em;font-variant-numeric:tabular-nums;
+  }
+  h2{font-family:"IBM Plex Serif", Georgia, serif;font-weight:600;font-size:26px;letter-spacing:-.01em;line-height:1.2;}
+  h3{
+    font-family:"IBM Plex Sans", sans-serif;font-weight:600;font-size:15px;
+    letter-spacing:.01em;margin:34px 0 12px;
+  }
+  h3:first-child{margin-top:0;}
+  h4{font-size:13px;font-weight:600;margin:0 0 6px;letter-spacing:.01em;}
+  p{max-width:68ch;margin:0 0 14px;}
+  p:last-child{margin-bottom:0;}
+  .lede{font-size:17px;color:var(--muted);max-width:64ch;}
+  ul.plain{list-style:none;display:flex;flex-direction:column;gap:9px;max-width:68ch;margin:0 0 14px;}
+  ul.plain li{padding-left:18px;position:relative;}
+  ul.plain li::before{
+    content:"";position:absolute;left:2px;top:.68em;width:6px;height:1px;background:var(--accent);
+  }
+
+  /* ---------- markers ---------- */
+  .m{
+    display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-size:10.5px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;
+    padding:2px 7px;border-radius:2px;vertical-align:.08em;
+  }
+  .m-ok{background:var(--ok-bg);color:var(--ok);}
+  .m-warn{background:var(--warn-bg);color:var(--warn);}
+  .m-bad{background:var(--bad-bg);color:var(--bad);}
+  .m-emp{background:var(--emp-bg);color:var(--emp);}
+  .m-as{background:var(--assume-bg);color:var(--assume);}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 4px;}
+  .legend div{display:flex;gap:8px;align-items:baseline;font-size:12.5px;color:var(--muted);}
+
+  /* ---------- status band ---------- */
+  .band{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .band-grid{display:grid;grid-template-columns:repeat(3,1fr);}
+  @media (max-width:760px){ .band-grid{grid-template-columns:1fr;} }
+  .band-cell{padding:20px 22px;border-right:1px solid var(--line-soft);}
+  .band-cell:last-child{border-right:0;}
+  @media (max-width:760px){
+    .band-cell{border-right:0;border-bottom:1px solid var(--line-soft);}
+    .band-cell:last-child{border-bottom:0;}
+  }
+  .band-cell .step{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:9px;
+  }
+  .band-cell h4{font-size:15px;font-family:"IBM Plex Serif", Georgia, serif;font-weight:600;margin-bottom:8px;}
+  .band-cell p{font-size:13px;color:var(--muted);line-height:1.5;margin:8px 0 0;}
+  .next{
+    display:flex;gap:16px;align-items:flex-start;padding:18px 22px;
+    background:var(--accent-soft);border-top:1px solid var(--line-soft);
+  }
+  .next .tag{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);padding-top:3px;white-space:nowrap;
+  }
+  .next p{margin:0;font-size:14px;color:var(--accent-ink);max-width:70ch;}
+
+  /* ---------- cards ---------- */
+  .grid{display:grid;gap:14px;}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g2{grid-template-columns:repeat(2,1fr);}
+  @media (max-width:820px){ .g3,.g2{grid-template-columns:1fr;} }
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;display:flex;flex-direction:column;gap:8px;
+  }
+  .card .kicker{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:10.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--faint);
+  }
+  .card p{font-size:13.5px;color:var(--muted);line-height:1.55;margin:0;}
+  .card strong{color:var(--ink);font-weight:600;}
+  .card.hi{border-color:var(--accent);background:var(--accent-soft);}
+  .card.hi p{color:var(--accent-ink);}
+  .card.hi .kicker{color:var(--accent);}
+
+  .stat{display:flex;flex-direction:column;gap:2px;}
+  .stat .v{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:24px;font-weight:600;
+    letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;
+  }
+  .stat .k{font-size:12px;color:var(--muted);line-height:1.4;}
+
+  /* ---------- tables ---------- */
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums;}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  thead th{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:10.5px;font-weight:500;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+    background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover td{background:var(--surface-2);}
+  td b,th b{font-weight:600;color:var(--ink);}
+  td .sub{display:block;font-size:12px;color:var(--faint);margin-top:2px;}
+  .num{font-family:"IBM Plex Mono", ui-monospace, monospace;font-weight:500;white-space:nowrap;}
+
+  /* ---------- timeline ---------- */
+  .tl{display:flex;flex-direction:column;}
+  .tl-row{
+    display:grid;grid-template-columns:74px minmax(0,1fr);gap:20px;
+    padding:16px 0;border-bottom:1px solid var(--line-soft);
+  }
+  .tl-row:last-child{border-bottom:0;}
+  .tl-w{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);padding-top:3px;
+  }
+  .tl-w b{display:block;font-size:19px;color:var(--accent);letter-spacing:-.01em;font-variant-numeric:tabular-nums;}
+  .tl-body h4{font-size:14.5px;}
+  .tl-body p{font-size:13.5px;color:var(--muted);margin:0;max-width:66ch;}
+  .gate{
+    display:inline-block;margin-top:9px;padding:5px 10px;border-radius:2px;
+    background:var(--warn-bg);color:var(--warn);
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:11px;letter-spacing:.06em;
+  }
+
+  /* ---------- checklist ---------- */
+  .checks{display:flex;flex-direction:column;gap:2px;}
+  .check{
+    display:flex;gap:11px;align-items:flex-start;padding:9px 12px;border-radius:var(--radius);
+    border:1px solid transparent;cursor:pointer;transition:background .12s,border-color .12s;
+  }
+  .check:hover{background:var(--surface-2);}
+  .check input{
+    appearance:none;width:15px;height:15px;margin:3px 0 0;flex:none;cursor:pointer;
+    border:1.5px solid var(--faint);border-radius:2px;background:var(--surface);
+    display:grid;place-content:center;transition:border-color .12s, background .12s;
+  }
+  .check input:checked{background:var(--accent);border-color:var(--accent);}
+  .check input:checked::after{
+    content:"";width:8px;height:4px;border:1.7px solid var(--surface);border-top:0;border-right:0;
+    transform:rotate(-45deg) translate(0,-1px);
+  }
+  .check span{font-size:13.5px;line-height:1.5;}
+  .check.done{border-color:var(--line-soft);background:var(--surface-2);}
+  .check.done span{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1px;}
+  .cl-head{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    margin-bottom:8px;padding:0 12px;
+  }
+  .cl-head .t{font-weight:600;font-size:14px;}
+  .cl-head .c{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:11.5px;color:var(--faint);
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------- callout ---------- */
+  .callout{
+    border-left:2px solid var(--accent);padding:2px 0 2px 20px;margin:22px 0;
+    max-width:68ch;
+  }
+  .callout p{font-family:"IBM Plex Serif", Georgia, serif;font-size:17px;line-height:1.5;color:var(--ink);}
+  .callout .who{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);margin-top:8px;
+  }
+
+  /* ---------- candidate ranking ---------- */
+  .cand{
+    display:grid;grid-template-columns:46px minmax(0,1fr) 120px;gap:18px;align-items:start;
+    padding:18px 0;border-bottom:1px solid var(--line-soft);
+  }
+  .cand:last-child{border-bottom:0;}
+  @media (max-width:720px){ .cand{grid-template-columns:34px minmax(0,1fr);} .cand .dots{grid-column:2;} }
+  .cand-id{
+    font-family:"IBM Plex Serif", Georgia, serif;font-size:26px;font-weight:600;line-height:1;
+    color:var(--line);padding-top:2px;
+  }
+  .cand.win .cand-id{color:var(--accent);}
+  .cand h4{font-size:15px;margin-bottom:4px;}
+  .cand p{font-size:13.5px;color:var(--muted);margin:0 0 6px;max-width:62ch;}
+  .cand .verdict{font-size:12.5px;color:var(--faint);}
+  .dots{display:flex;gap:4px;padding-top:5px;}
+  .dot{
+    width:14px;height:14px;border-radius:2px;display:grid;place-content:center;
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:9px;font-weight:600;
+    background:var(--surface-2);color:var(--faint);
+  }
+  .dot.y{background:var(--ok-bg);color:var(--ok);}
+  .dot.m{background:var(--warn-bg);color:var(--warn);}
+  .dot.n{background:var(--bad-bg);color:var(--bad);}
+
+  /* ---------- files ---------- */
+  .files{display:flex;flex-direction:column;gap:1px;}
+  .file{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:baseline;
+    padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  }
+  .file .fn{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:13px;font-weight:500;}
+  .file .fd{font-size:12.5px;color:var(--muted);}
+  .srcs{columns:2;column-gap:36px;font-size:13px;line-height:1.7;}
+  @media (max-width:720px){ .srcs{columns:1;} }
+  .srcs a{display:inline-block;}
+
+  footer{
+    margin-top:72px;padding-top:22px;border-top:1px solid var(--line);
+    font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:11.5px;color:var(--faint);
+    display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+
+<div class="shell">
+
+  <header class="mast">
+    <canvas id="rope" aria-hidden="true"></canvas>
+    <div class="mast-inner">
+      <div class="eyebrow"><span>Telegram Mini App</span><span>Hybrid-casual</span><span>Одна кнопка</span></div>
+      <h1>Штаб проєкту Гак</h1>
+      <p class="thesis">Гра, у якій <b>записані пробіжки інших гравців є фізичними об'єктами рівня</b>: за них чіпляються гаком, і кожен новий друг буквально розширює карту.</p>
+      <div class="mast-meta">
+        <span><b>Оновлено</b> 31.08.2026</span>
+        <span><b>Репозиторій</b> Zhmenya92/Game</span>
+        <span><b>Гілка</b> claude/mobile-game-minimal-animation-n0frv7</span>
+        <span><b>Стадія</b> Фаза 0 — розвідка</span>
+      </div>
+      <p class="capt">Дуга вгорі намальована детермінованою симуляцією з фіксованим кроком і сідом — тим самим правилом, на якому стоїть уся архітектура проєкту. Жодного <code>Math.random</code>.</p>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <nav class="rail" aria-label="Розділи">
+      <ol id="nav">
+        <li><a href="#stan"><span class="n">01</span> Стан</a></li>
+        <li><a href="#ideya"><span class="n">02</span> Ідея</a></li>
+        <li><a href="#perevirka"><span class="n">03</span> Верифікація</a></li>
+        <li><a href="#konkurenty"><span class="n">04</span> Конкуренти</a></li>
+        <li><a href="#dyf"><span class="n">05</span> Диференціація</a></li>
+        <li><a href="#plan"><span class="n">06</span> Реалізація</a></li>
+        <li><a href="#heity"><span class="n">07</span> Гейти</a></li>
+        <li><a href="#hroshi"><span class="n">08</span> Економіка</a></li>
+        <li><a href="#ryzyky"><span class="n">09</span> Ризики</a></li>
+        <li><a href="#rish"><span class="n">10</span> Рішення</a></li>
+        <li><a href="#dzherela"><span class="n">11</span> Файли</a></li>
+      </ol>
+      <button class="themebtn" id="themebtn" type="button">Тема</button>
+      <p class="rail-foot">Позначки достовірності наскрізні: якщо число не має «перевірено», воно не є підставою для рішення.</p>
+    </nav>
+
+    <main>
+
+      <!-- 01 -->
+      <section id="stan">
+        <div class="sec-head"><span class="n">01</span><h2>Стан на сьогодні</h2></div>
+        <p class="lede">Порядок денний із трьох пунктів, ухвалений 30 серпня. Два закриті, один лишається.</p>
+
+        <div class="band">
+          <div class="band-grid">
+            <div class="band-cell">
+              <div class="step">Пункт 1 · задача 0.1</div>
+              <h4>Аналіз конкурентів</h4>
+              <span class="m m-ok">Виконано 31.08</span>
+              <p>Кабінетна частина закрита. Ручні заміри з секундоміром лишаються в бланку — вони потрібні для тюнінгу балансу, але вибір диференціації не блокують.</p>
+            </div>
+            <div class="band-cell">
+              <div class="step">Пункт 2 · задача 0.2</div>
+              <h4>Технічний spike шерингу</h4>
+              <span class="m m-emp">Наступний крок</span>
+              <p>Чи долітає згенерований у браузері кліп у чат Telegram і чи анімується там. Єдина незакрита невідома розвідки.</p>
+            </div>
+            <div class="band-cell">
+              <div class="step">Пункт 3 · розділ 17</div>
+              <h4>Другий елемент диференціації</h4>
+              <span class="m m-ok">Запропоновано 31.08</span>
+              <p>Привид як фізичний об'єкт. Чекає затвердження власником — це рішення визначає, що саме будується в тижні 1.</p>
+            </div>
+          </div>
+          <div class="next">
+            <span class="tag">Далі</span>
+            <p>Затвердити або відхилити кандидата A, після чого зробити spike шерингу. Код прототипу не починається до обох подій.</p>
+          </div>
+        </div>
+
+        <h3>Як читати числа на цій сторінці</h3>
+        <div class="legend">
+          <div><span class="m m-ok">Перевірено</span> первинне або авторитетне джерело</div>
+          <div><span class="m m-warn">Спірно</span> джерела суперечать, наведено діапазон</div>
+          <div><span class="m m-bad">Спростовано</span> твердження не витримало перевірки</div>
+          <div><span class="m m-emp">Емпірика</span> вимірюється лише на власному продукті</div>
+          <div><span class="m m-as">Припущення</span> модельне число, не факт</div>
+        </div>
+      </section>
+
+      <!-- 02 -->
+      <section id="ideya">
+        <div class="sec-head"><span class="n">02</span><h2>Ідея</h2></div>
+        <p class="lede">Одна кнопка, дуга на тросі, і смерть, яка автоматично перетворюється на контент.</p>
+
+        <div class="grid g3" style="margin-bottom:26px;">
+          <div class="card">
+            <span class="kicker">Механіка</span>
+            <p>Герой летить уперед. <strong>Тап</strong> — трос чіпляється за верхню точку, герой іде по дузі. <strong>Відпустив</strong> — летить по інерції. Дві осі майстерності — тайминг і довжина дуги — при одній кнопці.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Віральний шар</span>
+            <p>Кільцевий буфер тримає <strong>останні 3 секунди</strong>. У момент смерті — сповільнення 0.25×, і кнопка «Поділитися кліпом»: 3 с відео + рахунок летять у чат. Поразка стає дією поширення.</p>
+          </div>
+          <div class="card hi">
+            <span class="kicker">Другий елемент · пропозиція</span>
+            <p>Привид друга — <strong>не декорація, а валідний анкер</strong>. За нього можна зачепитися тросом. Чужі рани стають ігровим ресурсом, і вірусність перестає бути проханням.</p>
+          </div>
+        </div>
+
+        <h3>Стартові параметри балансу</h3>
+        <p>Точка, від якої тюнимо, а не догма. Усі числа — в одному файлі <code>balance.ts</code>, змінюються без перезбірки.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Параметр</th><th>Стартове значення</th><th>Чому саме так</th></tr></thead>
+            <tbody>
+              <tr><td>Гравітація</td><td class="num">1600 px/с²</td><td>Задає темп дуги</td></tr>
+              <tr><td>Горизонтальна швидкість</td><td class="num">260 px/с</td><td>+8 px/с кожні 10 с, стеля 520</td></tr>
+              <tr><td>Довжина троса</td><td class="num">120–260 px</td><td>Автопідбір анкера в конусі 60°</td></tr>
+              <tr><td>Кутова швидкість</td><td>зберігає імпульс</td><td>Без демпфування — принцип «чесності»</td></tr>
+              <tr><td>Вікно вводу</td><td class="num">80 мс</td><td>Тап зараховується до валідного анкера</td></tr>
+              <tr><td>Хітбокс героя</td><td class="num">70 %</td><td>Прощаючий, від візуального розміру</td></tr>
+              <tr><td><b>Час рестарту</b></td><td class="num"><b>&lt; 400 мс</b></td><td>Критично для петлі «ще один раз»</td></tr>
+              <tr><td>Середній ран / сесія</td><td class="num">15–40 с / 5–7 хв</td><td>Ціль, перевіряється емпірично</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;"><b>Правило чесності:</b> жодної випадковості, що вбиває. Траса генерується з сіду, але кожна перешкода мусить бути проходимою з будь-якого валідного стану. Гравець має завжди сказати «я лоханувся», а не «гра підстава».</p>
+
+        <h3>Детермінізм — архітектурний центр, а не деталь</h3>
+        <p>Одна технічна властивість дає чотири продуктові фічі одразу. Тому вона не обговорюється як опція.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Якщо симуляція детермінована…</th><th>…то безкоштовно отримуємо</th></tr></thead>
+            <tbody>
+              <tr><td>Можна відтворити будь-який ран із сіду + вводу</td><td><b>Кліп для шерингу</b> — реплей на офскрін-канвасі</td></tr>
+              <tr><td>Можна відтворити чужий ран у себе</td><td><b>Привид друга</b> — і як візуал, і як анкер</td></tr>
+              <tr><td>Усі грають однаковий сід</td><td><b>Чесний щоденний челендж</b></td></tr>
+              <tr><td>Сервер може переграти ввід і звірити рахунок</td><td><b>Захист від читерства</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="plain" style="margin-top:16px;">
+          <li>Фіксований крок симуляції, рендер окремо від фізики.</li>
+          <li>Жодного <code>Math.random()</code> — тільки власний seeded PRNG.</li>
+          <li>Жодних <code>Math.sin/cos/tan</code> у симуляції: реалізації трансцендентних функцій не гарантовано ідентичні між V8 на Android і JavaScriptCore на iOS. Таблиці або поліноміальні апроксимації.</li>
+          <li>Трек вводу — це список подій <code>(кадр, тип)</code>, тобто <b>кілька сотень байт</b>, а не відео.</li>
+          <li>Із привидом-анкером детермінізм визначається трійкою <code>seed + inputTrace + ghostTrace</code>.</li>
+        </ul>
+      </section>
+
+      <!-- 03 -->
+      <section id="perevirka">
+        <div class="sec-head"><span class="n">03</span><h2>Верифікація дослідження</h2></div>
+        <p class="lede">Вихідне дослідження від 23 серпня перевірено по первинних джерелах. Стратегічне ядро вистояло, чотири твердження — ні.</p>
+
+        <h3>Що підтвердилося</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Твердження</th><th>Реальні дані</th></tr></thead>
+            <tbody>
+              <tr><td>Чистий hypercasual зламався, майбутнє — hybrid casual <span class="m m-ok">Перевірено</span></td><td>Hybrid-casual — єдиний казуальний сегмент, що зріс у 2025: <b>+20 % до $4.2 млрд</b> in-app доходу</td></tr>
+              <tr><td>Мінімум кадрів + tween замість спрайт-кадрів <span class="m m-ok">Перевірено</span></td><td>Атлас = 1–2 draw call проти 50+; GIF справді має 256 кольорів і 1-бітну прозорість. Це властивості форматів, не думка</td></tr>
+              <tr><td>Ретеншен-гейти D1 27 % / D7 10 % <span class="m m-ok">Перевірено</span></td><td>Орієнтир 2026: D1 ~27 %, D7 8–14 %. Hybrid-casual D7 <b>15–22 %</b>. Гейти стоять на правильному рівні</td></tr>
+              <tr><td>Стори жорстко ріжуть прості й AI-ігри <span class="m m-bad">Стало гірше</span></td><td>Apple у <b>червні 2026</b> посилив 4.3: додано <b>видалення</b> low-effort застосунків, а не лише реджект</td></tr>
+              <tr><td>Не купувати платний UA <span class="m m-ok">Посилено</span></td><td>Прямий доступ до кабінету Telegram Ads — <b>від €2 млн</b>. Через агентства €500–5 000. Питання закрите</td></tr>
+              <tr><td>Phaser як рушій <span class="m m-ok">Оновлено версію</span></td><td>Phaser <b>4.1.0</b> стабільний з 30.04.2026, 4.2 «Giedi» — червень. Беремо <b>4.2.x</b>, не 3.x</td></tr>
+              <tr><td>MediaRecorder для запису — ризиковано <span class="m m-ok">Підтверджено</span></td><td>На iOS подія <code>stop</code> не спрацьовує, WebKit Bug 181663 — фриз сторінки. Детермінований реплей замість live-захоплення рятує проєкт</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Що спростовано</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Знахідка 1 · критична</span>
+            <h4><span class="m m-bad">Спростовано</span> Ідея не унікальна</h4>
+            <p>Дослідження називало концепт «візуально унікальним». Насправді ніша зайнята: <strong>Stickman Hook — 100 млн+ завантажень</strong>, Swing Loops від SayGames — 10 млн, Hanger — 5 млн і шістнадцять років історії. Механіка не є нашим активом.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Знахідка 2 · критична</span>
+            <h4><span class="m m-bad">Спростовано</span> Шеринг — не клієнтська фіча</h4>
+            <p><code>WebApp.shareMessage</code> приймає лише <code>prepared_message_id</code> із <strong>серверного</strong> виклику <code>savePreparedInlineMessage</code>, і він <strong>одноразовий</strong>. Бекенд і об'єктне сховище — передумова головної фічі, а не тиждень 4.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Знахідка 3</span>
+            <h4><span class="m m-bad">Спростовано</span> Аудиторія менша у ~8 разів</h4>
+            <p>«500 млн взаємодій з міні-апами щодня» — це DAU Telegram у цілому. Міні-апи: пік <strong>1.44 млрд MAU</strong> у вересні 2024, далі обвал і стабілізація на <strong>150–190 млн MAU</strong>. Плануємо сотні й тисячі гравців, не мільйони.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Знахідка 4</span>
+            <h4><span class="m m-bad">Спростовано</span> CPI вищий у 2–10 разів</h4>
+            <p>Не $0.10–0.50, а <strong>$0.50–2.00</strong> за користувача через Telegram Ads. Висновок «у Telegram дешевше, ніж у сторах» лишається вірним, але перевага в 3–5 разів, а не в 10–20.</p>
+          </div>
+        </div>
+
+        <h3>Спірні числа, на яких не можна будувати</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Питання</th><th>Розкид</th><th>Наша позиція</th></tr></thead>
+            <tbody>
+              <tr><td>eCPM реклами в Telegram <span class="m m-warn">Спірно</span></td><td class="num">$0.40 … $6.00</td><td>Розходження у 15 разів. Плануємо за <b>$0.40–1.50</b>, реальну цифру міряємо на власному трафіку в тижні 8</td></tr>
+              <tr><td>eCPM у сторах <span class="m m-as">Припущення</span></td><td class="num">$3.02</td><td>У звіті Tenjin числа подані лише графіками-зображеннями. Беремо діапазон <b>$2–4</b> і звіряємо перед стор-фазою</td></tr>
+              <tr><td>ARPPU Telegram-ігор за даними PlayDeck <span class="m m-warn">Спірно</span></td><td class="num">$40–60</td><td>Для казуальної аркади нереалістично на порядок — це числа мідкору й крипти. <b>У розрахунках не використовуємо</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Що взагалі неможливо перевірити кабінетно <span class="m m-emp">Емпірика</span></h3>
+        <ul class="plain">
+          <li>Чи механіка залипає — жодні бенчмарки не скажуть, чи наша конкретна фізика приємна. <b>Тиждень 1.</b></li>
+          <li>Чи люди справді шерять кліпи — share rate є властивістю нашого продукту. <b>Тиждень 6.</b></li>
+          <li>Який наш реальний eCPM в Adsgram. <b>Тиждень 8+.</b></li>
+          <li>Чи конвертує магазинчик — payer conversion у hybrid casual зазвичай 1–3 %, але наша невідома. <b>Тиждень 8+.</b></li>
+          <li>Чи витримає Telegram-вебв'ю 60 FPS на дешевому Android. <b>Тиждень 1, на реальному пристрої.</b></li>
+        </ul>
+      </section>
+
+      <!-- 04 -->
+      <section id="konkurenty">
+        <div class="sec-head"><span class="n">04</span><h2>Конкуренти</h2></div>
+        <p class="lede">Конкурентних кіл три, і диференціюватися треба від усіх одночасно. Кола «канал» у першій версії плану не існувало взагалі — це головна знахідка розвідки.</p>
+
+        <div class="grid g3" style="margin-bottom:30px;">
+          <div class="card">
+            <span class="kicker">Коло 1 · механіка</span>
+            <h4>Stickman Hook, Swing Loops, Hanger</h4>
+            <p>Конкуруємо за <strong>схвалення в App Store</strong> і ASO. Вирішується у стор-фазі.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Коло 2 · канал</span>
+            <h4>Telegram, GAMEE, PlayDeck</h4>
+            <p>Конкуруємо за <strong>увагу всередині Telegram</strong> і місце в чаті. Вирішується у тижнях 3–8.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Коло 3 · поведінка</span>
+            <h4>Wordle-клас</h4>
+            <p>Конкуруємо за <strong>саму звичку ділитися результатом</strong> у чаті. Вирішується постійно.</p>
+          </div>
+        </div>
+
+        <h3>Коло 1 — прямі конкуренти по механіці</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Гра</th><th>Розробник</th><th>Масштаб</th><th>Соціальний шар</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Stickman Hook</b></td><td>Madbox</td>
+                <td class="num">100 млн+<span class="sub">1 млн оцінок, 4.7★ · 7 848 278 голосів на Poki</span></td>
+                <td><b>Є.</b> Game Center, ачівки, шеринг відео, з 2026 — Adventure Mode проти 1500 гравців</td>
+              </tr>
+              <tr>
+                <td><b>Swing Loops</b></td><td>SayGames</td>
+                <td class="num">10 млн+</td>
+                <td>Немає <span class="m m-warn">Спірно</span></td>
+              </tr>
+              <tr>
+                <td><b>Hanger</b></td><td>A Small Game</td>
+                <td class="num">5 млн+<span class="sub">Flash 2010 → HTML5 2018</span></td>
+                <td>Немає</td>
+              </tr>
+              <tr>
+                <td><b>Hanger World</b></td><td>A Small Game</td>
+                <td>2015, Steam + мобільні</td>
+                <td><b>Є.</b> Редактор рівнів, обмін levelCode, лідерборди на рівнях гравців</td>
+              </tr>
+              <tr>
+                <td><b>Stickman Hook 2</b></td><td>Madbox</td>
+                <td class="num">331 оцінка, 3.5★</td>
+                <td>Немає</td>
+              </tr>
+              <tr>
+                <td><b>Endless Hook</b></td><td>GaconGame</td>
+                <td>v0.5.1, оновлена 13.05.2026<span class="sub">30.9 МБ, офлайн</span></td>
+                <td>Немає — «змагайся сам із собою»</td>
+              </tr>
+              <tr>
+                <td>Hooky Crook · Grapple Grip · Hook Champ · Hang Line</td><td>—</td>
+                <td>Дрібні й старі</td><td>Немає</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid g3" style="margin-top:22px;">
+          <div class="card">
+            <span class="kicker">Висновок 1</span>
+            <p>Ніша зайнята <strong>вдвічі щільніше</strong>, ніж вважало дослідження: сотні мільйонів завантажень у трьох незалежних франшизах.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Висновок 2</span>
+            <p><strong>Контент — не рів, і це довів сам Madbox.</strong> Sequel має більше контенту, а отримав 331 оцінку проти мільйона і 3.5★ проти 4.7★.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Висновок 3</span>
+            <p>У лідера є вимірна вразливість: <strong>802.7 МБ</strong> інсталяційного розміру проти нашої цілі <strong>≤ 3 МБ</strong> і відкриття без установки.</p>
+          </div>
+        </div>
+
+        <h3>Що дратує гравців лідера <span class="m m-ok">З відгуків</span></h3>
+        <div class="callout">
+          <p>«ads appear EVERY time you begin and finish level (or die)» · «it's the same 5 things over and over again. Try and mix it up a little»</p>
+          <div class="who">відгуки на Stickman Hook · 984 737 відгуків, індекс репутації 54 %</div>
+        </div>
+        <p>Це прямий список можливостей, і він збігається з нашою архітектурою: реклама тільки rewarded і тільки за вибором гравця, а проти повторюваності працює генерація траси сідом замість списку зі 150 рівнів.</p>
+
+        <h3>Коло 2 — канал, який ми не бачили</h3>
+        <div class="grid g3">
+          <div class="card">
+            <span class="kicker">Telegram · з 2016</span>
+            <div class="stat"><span class="v">10 років</span><span class="k">штатній ігровій платформі</span></div>
+            <p>Лідерборди в <strong>кожному чаті</strong> плюс сповіщення про нового лідера — це вбудована функція, а не наша ідея. <code>sendGame</code>, <code>setGameScore</code> живі у 2026.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">GAMEE</span>
+            <div class="stat"><span class="v">50–119 млн</span><span class="k">зареєстрованих гравців <span class="m m-warn">Спірно</span></span></div>
+            <p>60+ власних ігор, соціальний шар, запуск у групових чатах, Challenge Friends. У березні 2026 — призовий фонд $500 000.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">PlayDeck</span>
+            <div class="stat"><span class="v">100 тис. MAU</span><span class="k">50+ ігор у каталозі</span></div>
+            <p>Водночас конкурент і <strong>потенційний канал дистрибуції для нас</strong>. Оцінити після гейта 3.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <p>Пріоритет отримують ігри, де соціальна взаємодія вбудована в саму структуру геймплею і де гравець не може просуватися наодинці.</p>
+          <div class="who">PlayDeck · видавець Telegram-ігор</div>
+        </div>
+        <p>Їхні кейси підтверджують порядок величин: у State.io CPI на <b>70 % нижче ринку</b> і конверсія «встановлення → запуск» <b>96 %</b>; Idle Legion — <b>+25 %</b> конверсії без збільшення бюджету; Epic Puzzle — <b>+160 %</b> активної аудиторії. І окремо: «покладатися виключно на рекламну монетизацію рідко дає життєздатний продукт». У каталозі findmini — <b>474 міні-апи</b> в категорії аркад, тобто перенасичення тут теж є, просто без рев'ю на вході.</p>
+
+        <h3>Коло 3 — Wordle і три вимоги до нашого кліпу</h3>
+        <p>Зростання без бюджету: кілька тисяч гравців наприкінці листопада, сотні тисяч наприкінці грудня, мільйони на початку січня. Емодзі-сітку <b>придумав не автор</b> — гравці почали робити її самі, а він побачив і вбудував кнопку під уже наявну поведінку.</p>
+        <ul class="plain">
+          <li>Артефакт має читатися <b>сам по собі</b>, без відкриття гри.</li>
+          <li>Він <b>не має нічого просити</b> — «зіграй теж» це можливість, а не прохання.</li>
+          <li><b>Спільний сід дня</b> — не додаткова фіча, а частина причини, чому люди діляться.</li>
+        </ul>
+
+        <h3>Головна гіпотеза плану — перевірка</h3>
+        <p><b>Було:</b> «жоден із конкурентів не має соціального шару». <span class="m m-bad">Спростовано</span> у цьому формулюванні — лідерборди є в Telegram із 2016, у Stickman Hook, у Hanger World, у GAMEE. Прецеденти «привид друга по посиланню» теж існують: Ghost Pro Racing 3D, GameDuo, GRAPPLE//drift — просто в мікромасштабі та в інших жанрах.</p>
+        <p><b>Стало:</b> вільним лишається точний перетин із п'яти умов, і жоден проєкт не має їх усіх разом.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Умова</th><th>Хто вже має</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Механіка гака / свінгу</td><td>Багато хто</td></tr>
+              <tr><td class="num">2</td><td>Однаковий сід для обох гравців</td><td>Ghost Pro Racing, щоденні челенджі</td></tr>
+              <tr><td class="num">3</td><td>Привид конкретного друга з чату</td><td>Real Racing 3, GameDuo</td></tr>
+              <tr><td class="num">4</td><td>Автоматичний відео-артефакт рану</td><td>GameDuo</td></tr>
+              <tr><td class="num">5</td><td><b>Привид впливає на геймплей</b></td><td><b>Ніхто — прецеденту не знайдено взагалі</b><span class="sub">Найближчі родичі — взаємодія з власним минулим: Super Time Force, Braid (світ 4)</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 05 -->
+      <section id="dyf">
+        <div class="sec-head"><span class="n">05</span><h2>Диференціація</h2></div>
+        <p class="lede">Соціальний шар прийнято як напрям, але його замало. Шість кандидатів на другий елемент, зважені за шістьма критеріями.</p>
+
+        <h3>Критерії</h3>
+        <div class="scroll" style="margin-bottom:8px;">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Критерій</th><th>Звідки</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Дає письмову відповідь на Apple 4.3 «meaningfully different»</td><td>plan.md 12.3</td></tr>
+              <tr><td class="num">2</td><td>Перевіряється на прямокутниках у тижні 1–2</td><td>plan.md 8</td></tr>
+              <tr><td class="num">3</td><td>Вартість реалізації в межах бюджету й строку</td><td>plan.md 14</td></tr>
+              <tr><td class="num">4</td><td>Немає в Stickman Hook / Hanger World / Swing Loops</td><td>Розвідка, коло 1</td></tr>
+              <tr><td class="num">5</td><td><b>Не дублює штатні можливості Telegram і GAMEE</b></td><td>Розвідка, коло 2 — новий</td></tr>
+              <tr><td class="num">6</td><td><b>Робить вірусність геймплейною потребою, а не проханням</b></td><td>Розвідка, коло 3 — новий</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:13.5px;color:var(--muted);">Критерій 6 — найважливіший. Прохання «поділися з другом» конкурує з мільйоном таких самих прохань і програє. Потреба «мені потрібні чужі рани, щоб грати краще» не конкурує ні з чим.</p>
+
+        <h3>Кандидати</h3>
+        <div>
+          <div class="cand win">
+            <div class="cand-id">A</div>
+            <div>
+              <h4>Привид як фізичний об'єкт — «гак по привиду»</h4>
+              <p>Привид друга є валідним анкером. Щоб ним скористатися, треба наздогнати його <b>в просторі і в часі</b> — виникає погоня, якої немає ні в кого. Хто попереду, допомоги не отримує: самобалансуюча гумка. Чужі рани стають ресурсом, і що більше друзів, то вища стеля рекорду.</p>
+              <p class="verdict"><b>Рекомендовано.</b> Єдиний кандидат, що бере всі шість критеріїв. Тестується <b>без бекенду</b>: у тижні 1 привид — це твій власний попередній ран.</p>
+            </div>
+            <div class="dots" title="Критерії 1–6">
+              <span class="dot y">1</span><span class="dot y">2</span><span class="dot m">3</span><span class="dot y">4</span><span class="dot y">5</span><span class="dot y">6</span>
+            </div>
+          </div>
+
+          <div class="cand">
+            <div class="cand-id">B</div>
+            <div>
+              <h4>«Павутина» — троси лишаються на трасі</h4>
+              <p>Варіація A. Кожен трос після відпускання лишається фізичною лінією — спершу твої, потім лінії друга. Дуже сильна візуальна ідентичність: скріншот упізнається миттєво.</p>
+              <p class="verdict">Варіант A2. Мінус — пізніше в рані траса стає кашею. Перевіряється тим самим прототипом за +1 день.</p>
+            </div>
+            <div class="dots"><span class="dot y">1</span><span class="dot y">2</span><span class="dot m">3</span><span class="dot y">4</span><span class="dot y">5</span><span class="dot m">6</span></div>
+          </div>
+
+          <div class="cand">
+            <div class="cand-id">C</div>
+            <div>
+              <h4>«Прокляття» — кидаючи виклик, ставиш пастки</h4>
+              <p>Витрачаєш 1–3 заряди на розміщення перешкод на трасі, яку отримає друг. Асиметрія і злорадство — сильне соціальне паливо.</p>
+              <p class="verdict">Не в MVP. Hanger World має редактор рівнів із 2015, плюс UGC означає модерацію, плюс екран редактора ламає цикл «смерть → рестарт &lt; 400 мс».</p>
+            </div>
+            <div class="dots"><span class="dot m">1</span><span class="dot m">2</span><span class="dot n">3</span><span class="dot n">4</span><span class="dot y">5</span><span class="dot y">6</span></div>
+          </div>
+
+          <div class="cand">
+            <div class="cand-id">D</div>
+            <div>
+              <h4>«Перемотка» — одна відмотка на ран</h4>
+              <p>Детермінізм робить перемотку на 1.5 с майже безкоштовною. У кліпі вона показується як тінь невдалої спроби, тобто фіча сама себе рекламує.</p>
+              <p class="verdict">Друга хвиля. Прецедентів забагато (Braid, Prince of Persia, Super Time Force) — на 4.3 сама по собі не відповідає.</p>
+            </div>
+            <div class="dots"><span class="dot n">1</span><span class="dot y">2</span><span class="dot y">3</span><span class="dot m">4</span><span class="dot y">5</span><span class="dot n">6</span></div>
+          </div>
+
+          <div class="cand">
+            <div class="cand-id">E</div>
+            <div>
+              <h4>«Банк ризику» — множник, який можна забрати або втратити</h4>
+              <p>Множник росте, поки не торкаєшся анкера. Тап на «банк» фіксує, смерть обнуляє. Класична push-your-luck, додає глибини рішенням.</p>
+              <p class="verdict">Кандидат у баланс, не в диференціацію. Дешевий запасний варіант, якщо A провалить гейт.</p>
+            </div>
+            <div class="dots"><span class="dot n">1</span><span class="dot y">2</span><span class="dot y">3</span><span class="dot m">4</span><span class="dot n">5</span><span class="dot n">6</span></div>
+          </div>
+
+          <div class="cand">
+            <div class="cand-id">F</div>
+            <div>
+              <h4>«Естафета» — друг продовжує твій ран</h4>
+              <p>Друг стартує не з нуля, а з точки й швидкості, на якій ти загинув. Рахунок чату сумарний, ланцюжок видно в переписці. Кооперація замість змагання — цього не робить ніхто в жанрі.</p>
+              <p class="verdict">Сезон 2. Вимагає повного бекенду до першого тесту, тому на прямокутниках у тижні 1 не перевіряється.</p>
+            </div>
+            <div class="dots"><span class="dot y">1</span><span class="dot n">2</span><span class="dot n">3</span><span class="dot y">4</span><span class="dot y">5</span><span class="dot m">6</span></div>
+          </div>
+        </div>
+
+        <h3>Формула продукту, якщо A приймається</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Соціальний шар</span>
+            <p>Однаковий сід + виклик у чат + кліп-артефакт. Це <strong>дистрибуція</strong>.</p>
+          </div>
+          <div class="card hi">
+            <span class="kicker">Привид-анкер</span>
+            <p>Це <strong>геймплейна причина, чому чужі рани потрібні</strong>. Разом петля перестає триматися на проханні поділитися.</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <p>Це не гра про свінг. Це гра, де записані пробіжки інших гравців є фізичними об'єктами рівня: ви чіпляєтесь до них гаком, і кожен новий друг буквально розширює карту.</p>
+          <div class="who">заготовка відповіді для App Store Review</div>
+        </div>
+
+        <h3>Інженерні наслідки й ризики</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Архітектура</span>
+            <p>Привид стає <strong>входом симуляції</strong>: детермінізм визначається трійкою <code>seed + inputTrace + ghostTrace</code>. <code>POST /run</code> мусить приймати хеш ghostTrace, інакше рахунок не переграється. Циклічної залежності немає — привид не реагує на гравця.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Ризики</span>
+            <p><strong>Читабельність:</strong> два силуети в кадрі на телефоні — мітигація через напівпрозорість і підсвітку анкерної зони. <strong>Холодний старт:</strong> у першого гравця немає чужих привидів — мітигація через власний пул, <strong>явно позначений як еталонний</strong>, а не виданий за живих людей.</p>
+          </div>
+        </div>
+
+        <h3>Протокол перевірки в тижні 1 — grey-box, без бекенду</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>День</th><th>Що робиться</th><th>Критерій</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1–2</td><td>Детермінована симуляція + гак + запис inputTrace</td><td>Той самий сід + ввід = той самий результат</td></tr>
+              <tr><td class="num">3</td><td>Відтворення власного попереднього рану як привида</td><td>Привид точно повторює траєкторію</td></tr>
+              <tr><td class="num">4</td><td>Привид стає анкером: зачеплення, імпульс, підсвітка</td><td>Зачеплення фізично працює</td></tr>
+              <tr><td class="num">5</td><td>Тюнінг радіуса, бонусу до імпульсу, прозорості</td><td>3 сторонні людини <b>самі</b> здогадуються зачепитися за ≤ 3 рани</td></tr>
+              <tr><td class="num">6</td><td>Варіант B на тому самому прототипі</td><td>Порівняння A проти B на тих самих людях</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;">Якщо жоден варіант не дає читабельного, приємного зачеплення за 6 днів — повертаємось до кандидата E і визнаємо, що диференціації рівня 4.3 у нас немає. Це нормальний результат ціною тижня.</p>
+      </section>
+
+      <!-- 06 -->
+      <section id="plan">
+        <div class="sec-head"><span class="n">06</span><h2>Реалізація</h2></div>
+        <p class="lede">Порядок фаз змінено проти вихідного дослідження: диференціація перевіряється <b>до</b> арту. Якщо соціальна петля не працює, гарний арт її не врятує.</p>
+
+        <div class="tl">
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>0</b></div>
+            <div class="tl-body">
+              <h4>Розвідка</h4>
+              <p>Конкуренти <span class="m m-ok">Закрито</span> · технічний spike шерингу <span class="m m-emp">Далі</span> · рішення про юрособу для Google Play. Spike перевіряє повний ланцюг: gif.js у Worker → Cloudflare R2 → <code>savePreparedInlineMessage</code> → <code>shareMessage</code>, і міряє час кодування на дешевому Android.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>1</b></div>
+            <div class="tl-body">
+              <h4>Grey-box прототип</h4>
+              <p>Фізика гака, детермінований фіксований крок, seeded генерація траси, рестарт &lt; 400 мс, запис траси вводу, привид-анкер на власному рані. Нуль графіки, нуль звуку, нуль меню.</p>
+              <span class="gate">🚦 Гейт 1 — механіка</span>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>2</b></div>
+            <div class="tl-body">
+              <h4>Джус і реплей</h4>
+              <p>Squash &amp; stretch, screenshake 80–150 мс, hit-stop 40–80 мс, частинки, tint-flash, easing, HapticFeedback. Кільцевий буфер, офскрін-реплей, slow-mo 0.25×. Досі нуль намальованого арту.</p>
+              <span class="gate">🚦 Гейт 2 — реплей</span>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>3–4</b></div>
+            <div class="tl-body">
+              <h4>Telegram і соціальний шар</h4>
+              <p>Бекенд: HMAC-валідація initData, серверна верифікація рахунку переграванням, заливка кліпів у R2, <code>savePreparedInlineMessage</code>, віддача привидів, сід дня, обов'язковий <code>/paysupport</code>. Повна віральна петля з діп-лінком <code>startapp</code>. Запуск на 50–100 живих людей — усе ще на прямокутниках.</p>
+              <span class="gate">🚦 Гейт 3 — диференціація · найважливіший</span>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>5</b></div>
+            <div class="tl-body">
+              <h4>AI-арт</h4>
+              <p>Style bible → персонаж → кадри руху → зняття фону → <b>ручне вирівнювання pivot</b> → атлас. Бюджет 8–12 кадрів на всю гру. Атлас ≤ 2048×2048 і ≤ 500 КБ, увесь білд ≤ 3 МБ gzip, час до першого кадру ≤ 2 с.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>6</b></div>
+            <div class="tl-body">
+              <h4>Монетизація й аналітика</h4>
+              <p>Telegram Stars, Adsgram rewarded, власний <code>POST /event</code> і дашборд. Мінімальний набір подій, без якого гейти неможливо порахувати.</p>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>7–8</b></div>
+            <div class="tl-body">
+              <h4>Софтлонч і збір даних</h4>
+              <p>Мінімум два тижні збору — інакше D7 не порахувати.</p>
+              <span class="gate">🚦 Гейт 4 — рішення про стор-фазу</span>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-w">Тиждень<b>9+</b></div>
+            <div class="tl-body">
+              <h4>Стор-фаза — умовна</h4>
+              <p>Тільки після гейта 4. Capacitor поверх того самого білду, AdMob / AppLovin MAX замість Adsgram, нативний share sheet. Google Play: 12 тестувальників × 14 безперервних днів для персональних акаунтів — організаційні звільнені. App Store: підготовлене письмове обґрунтування за Guideline 4.3.</p>
+            </div>
+          </div>
+        </div>
+
+        <h3>Архітектура</h3>
+        <div class="grid g2">
+          <div class="card">
+            <span class="kicker">Клієнт</span>
+            <p>Phaser <strong>4.2.x</strong> + TypeScript + Vite. Ядро <code>src/sim/</code>: <code>Simulation.ts</code>, <code>Prng.ts</code>, <code>InputTrace.ts</code>, <code>MathDet.ts</code>, <code>GhostBody.ts</code>. Один атлас, один аудіоспрайт, усі числа балансу в <code>config/balance.ts</code>.</p>
+          </div>
+          <div class="card">
+            <span class="kicker">Сервер — не опційно</span>
+            <p><code>auth.ts</code> HMAC-валідація · <code>verify.ts</code> переграванння вводу й античит · <code>share.ts</code> одноразові prepared-повідомлення · <code>clips.ts</code> заливка в R2 з TTL · <code>bot.ts</code> вебхук, діп-лінки, платежі, <code>/paysupport</code>. Хостинг — Cloudflare Workers, бо R2 у тій самій екосистемі.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 07 -->
+      <section id="heity">
+        <div class="sec-head"><span class="n">07</span><h2>Гейти</h2></div>
+        <p class="lede">Чотири точки, у яких проєкт або продовжується, або чесно закривається. Чекбокси зберігаються у вашому браузері.</p>
+
+        <div class="grid g2">
+          <div class="card" style="gap:0;padding:18px 8px;">
+            <div class="cl-head"><span class="t">🚦 Гейт 1 — механіка</span><span class="c" data-count="g1">0 / 6</span></div>
+            <div class="checks" data-gate="g1">
+              <label class="check"><input type="checkbox" data-k="g1a"><span>20 ранів підряд без свідомого зусилля</span></label>
+              <label class="check"><input type="checkbox" data-k="g1b"><span>3 сторонні людини грають ≥ 10 ранів, не будучи попрошеними</span></label>
+              <label class="check"><input type="checkbox" data-k="g1c"><span>Стабільні 60 FPS на бюджетному Android у Telegram-вебв'ю</span></label>
+              <label class="check"><input type="checkbox" data-k="g1d"><span>Рестарт вкладається в 400 мс</span></label>
+              <label class="check"><input type="checkbox" data-k="g1e"><span>Детермінізм: той самий сід + ввід = той самий результат на iOS і Android</span></label>
+              <label class="check"><input type="checkbox" data-k="g1f"><span>Привид-анкер зрозумілий без пояснень за ≤ 3 рани</span></label>
+            </div>
+          </div>
+          <div class="card" style="gap:0;padding:18px 8px;">
+            <div class="cl-head"><span class="t">🚦 Гейт 2 — реплей</span><span class="c" data-count="g2">0 / 3</span></div>
+            <div class="checks" data-gate="g2">
+              <label class="check"><input type="checkbox" data-k="g2a"><span>Реплей побайтово відтворює оригінальний ран</span></label>
+              <label class="check"><input type="checkbox" data-k="g2b"><span>Кодування вкладається в бюджет, виміряний у spike 0.2</span></label>
+              <label class="check"><input type="checkbox" data-k="g2c"><span>Гра «відчувається дорогою» на прямокутниках — ті самі 3 тестувальники</span></label>
+            </div>
+          </div>
+        </div>
+
+        <h3>🚦 Гейт 3 — диференціація · кінець тижня 4</h3>
+        <p>Запускаємо на 50–100 живих людей, усе ще без графіки. Якщо соціальна петля не працює тут, вона не запрацює з гарним артом: арт додає ~15 % до сприйняття, а не в рази.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Метрика</th><th>Мінімум</th><th>Добре</th></tr></thead>
+            <tbody>
+              <tr><td><b>Share rate</b> — шер / смерть</td><td class="num">2 %</td><td class="num">5 %+</td></tr>
+              <tr><td>Конверсія переходу за викликом</td><td class="num">25 %</td><td class="num">40 %+</td></tr>
+              <tr><td>Reply rate — зіграв ту саму трасу</td><td class="num">50 %</td><td class="num">70 %+</td></tr>
+              <tr><td><b>K-фактор</b></td><td class="num">0.25</td><td class="num">0.4+</td></tr>
+              <tr><td><b>Ghost-hook rate</b> <span class="m m-emp">Нове</span><span class="sub">ранів, де гравець хоч раз зачепився за привида</span></td><td class="num">30 %</td><td class="num">50 %+</td></tr>
+              <tr><td>D1 retention <span class="sub">зі знижкою — без арту й звуку</span></td><td class="num">20 %</td><td class="num">27 %+</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;">Якщо K &lt; 0.15 — петлю треба переробляти або визнати, що диференціації немає. Тоді проєкт не має відповіді на Apple 4.3 і не має причини існувати поруч зі Stickman Hook. Якщо ghost-hook rate &lt; 30 % — привид декоративний, і другий елемент не спрацював.</p>
+
+        <h3>🚦 Гейт 4 — фінальний · тиждень 7–8</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Метрика</th><th>Мінімум</th><th>Добре</th></tr></thead>
+            <tbody>
+              <tr><td><b>D1 retention</b></td><td class="num">27 %</td><td class="num">33 %+</td></tr>
+              <tr><td><b>D7 retention</b></td><td class="num">10 %</td><td class="num">12–15 %</td></tr>
+              <tr><td>Сесій на день</td><td class="num">2.5</td><td class="num">4+</td></tr>
+              <tr><td>Довжина сесії</td><td class="num">4 хв</td><td class="num">5–7 хв</td></tr>
+              <tr><td><b>K-фактор</b></td><td class="num">0.25</td><td class="num">0.4+</td></tr>
+              <tr><td>Rewarded opt-in</td><td class="num">15 %</td><td class="num">25 %+</td></tr>
+              <tr><td>Payer conversion</td><td class="num">1 %</td><td class="num">2–3 %</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid g3" style="margin-top:18px;">
+          <div class="card"><span class="kicker">Результат A</span><p>Усі мінімуми пройдено → <strong>стор-фаза</strong>.</p></div>
+          <div class="card"><span class="kicker">Результат B</span><p>D1 ≥ 27 %, але K &lt; 0.25 → механіка працює, петля ні. Одна ітерація соціального шару, 2 тижні. <strong>Виправний випадок.</strong></p></div>
+          <div class="card"><span class="kicker">Результат C</span><p>D1 &lt; 27 % після 2 ітерацій → концепт не рятується поліруванням. <strong>Закриваємо.</strong> Витрачено 8 тижнів і ~$100 — прийнятна ціна помилки.</p></div>
+        </div>
+      </section>
+
+      <!-- 08 -->
+      <section id="hroshi">
+        <div class="sec-head"><span class="n">08</span><h2>Економіка</h2></div>
+        <p class="lede">Telegram-фаза — це не спосіб заробити. Це спосіб безкоштовно з'ясувати, чи гра комусь потрібна.</p>
+
+        <div class="grid g3" style="margin-bottom:26px;">
+          <div class="card"><div class="stat"><span class="v">$50–120</span><span class="k">увесь бюджет Telegram-фази, тижні 0–8</span></div></div>
+          <div class="card"><div class="stat"><span class="v">$0</span><span class="k">платний UA — доступ до Telegram Ads від €2 млн, питання закрите</span></div></div>
+          <div class="card"><div class="stat"><span class="v">~$150–180</span><span class="k">модельний дохід на 10 000 гравців <span class="m m-as">Припущення</span></span></div></div>
+        </div>
+
+        <h3>Бюджет</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Стаття</th><th>Вартість</th><th>Статус</th></tr></thead>
+            <tbody>
+              <tr><td>Домен</td><td class="num">$10–15 / рік</td><td><span class="m m-as">Припущення</span> звірити в реєстратора</td></tr>
+              <tr><td><b>Cloudflare R2</b></td><td class="num">$0</td><td><span class="m m-ok">Перевірено</span> 10 ГБ сховища, 1 млн Class A, 10 млн Class B, <b>нульовий egress</b></td></tr>
+              <tr><td>Хостинг фронту й бекенду</td><td class="num">$0–10 / міс</td><td>Безкоштовні тарифи покривають старт</td></tr>
+              <tr><td>AI-арт</td><td class="num">$20–70</td><td><span class="m m-as">Припущення</span> звірити актуальні ціни перед закупівлею</td></tr>
+              <tr><td>AI-аудіо</td><td class="num">$0–25</td><td>Freemium</td></tr>
+              <tr><td>Apple Developer Program</td><td class="num">$99 / рік</td><td>Тільки у стор-фазі</td></tr>
+              <tr><td>Google Play</td><td class="num">$25 одноразово</td><td>Тільки у стор-фазі</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Монетизація Telegram-фази</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Джерело</th><th>Реалістика</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Telegram Stars</b><span class="sub">скіни, continue-паки</span></td>
+                <td>Основне. Telegram комісії не бере, але Apple / Google беруть <b>30 %</b> на мобільних купівлях → ефективно <b>~$0.009 за Star</b>. Мінімум виведення <b>1 000 Stars</b>, холд <b>21 день</b>, виведення тільки в TON через Fragment. Обов'язковий <code>/paysupport</code> <span class="m m-ok">Перевірено</span></td>
+              </tr>
+              <tr>
+                <td><b>Adsgram rewarded</b><span class="sub">один continue за ран</span></td>
+                <td>eCPM <span class="m m-warn">Спірно</span> — плануємо за $0.40–1.50, верхні оцінки $5–6 не підтверджені для казуального трафіку</td>
+              </tr>
+              <tr><td>TON / P2E</td><td><b>Не робимо.</b> Категорія просіла, регуляторний ризик, вбиває довіру</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;"><b>Що це означає на практиці:</b> щоб узагалі побачити перші гроші, треба накопичити 1 000 Stars — це $9–13 нам — і ще чекати 21 день. Не блокер, але це вбиває ідею «швидко перевірити монетизацію». Гроші, якщо будуть, — у стор-фазі.</p>
+      </section>
+
+      <!-- 09 -->
+      <section id="ryzyky">
+        <div class="sec-head"><span class="n">09</span><h2>Ризики</h2></div>
+        <p class="lede">Кожен ризик має місце, де ми його ловимо. Ризик без такого місця — це не ризик, а тривога.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Ризик</th><th>Імовірність</th><th>Вплив</th><th>Мітигація</th><th>Де ловимо</th></tr></thead>
+            <tbody>
+              <tr><td><b>Механіка не залипає</b></td><td>Висока</td><td>Фатальний</td><td>Grey-box тиждень 1, до будь-яких вкладень</td><td>Гейт 1</td></tr>
+              <tr><td><b>Соціальна петля не працює</b></td><td>Висока</td><td>Фатальний</td><td>Перевірка на прямокутниках до арту</td><td><b>Гейт 3</b></td></tr>
+              <tr><td>Шеринг GIF технічно не працює</td><td>Середня</td><td>Високий</td><td>Spike 0.2 до розробки + план Б (PNG-картка) і план В (текстовий шер)</td><td>Задача 0.2</td></tr>
+              <tr><td><b>Реджект App Store 4.3</b></td><td><b>Висока</b></td><td>Високий</td><td>П'ятикомпонентний перетин як обґрунтування; не клон-нейм; готове письмове пояснення</td><td>Фаза 7</td></tr>
+              <tr><td>Порушення детермінізму між iOS і Android</td><td>Середня</td><td>Високий</td><td>Заборона Math.sin/cos/random у sim; CI-автотест на побайтову ідентичність</td><td>Гейт 1</td></tr>
+              <tr><td>Привид нечитабельний у кадрі</td><td>Середня</td><td>Високий</td><td>Напівпрозорість, підсвітка анкерної зони, тюнінг у день 5</td><td>Гейт 1, критерій 6</td></tr>
+              <tr><td>Холодний старт: немає чужих привидів</td><td>Висока</td><td>Середній</td><td>Власний пул еталонних ранів, явно позначених</td><td>Фаза 3</td></tr>
+              <tr><td>Баги MediaRecorder на iOS</td><td>Висока</td><td>Середній</td><td>Не використовуємо взагалі — детермінований реплей + gif.js</td><td>Архітектура</td></tr>
+              <tr><td>AI-кадри «плавають»</td><td>Висока</td><td>Середній</td><td>8–12 кадрів максимум, обов'язковий ручний прохід pivot</td><td>Фаза 4</td></tr>
+              <tr><td>Дохід від реклами ~нуль</td><td>Висока</td><td>Середній</td><td>Прийнято заздалегідь: Telegram = валідація, не дохід</td><td>Розділ 8</td></tr>
+              <tr><td>Ліцензії AI-інструментів</td><td>Середня</td><td>Середній</td><td>Перевірка умов <b>до</b> фінальної генерації + скриншот на дату</td><td>Фаза 4</td></tr>
+              <tr><td>Гальмує на дешевих Android</td><td>Середня</td><td>Середній</td><td>1 атлас, 1 draw call, авто-даунгрейд частинок, тест на реальному пристрої з тижня 1</td><td>Гейт 1</td></tr>
+              <tr><td>Аудиторія міні-апів менша, ніж очікували</td><td>Підтверджено</td><td>Середній</td><td>Планувати сотні й тисячі гравців, не мільйони</td><td>Прийнято</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 10 -->
+      <section id="rish">
+        <div class="sec-head"><span class="n">10</span><h2>Рішення</h2></div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Питання</th><th>Стан</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Чи приймаємо знахідку про неунікальність механіки</td><td><span class="m m-ok">Вирішено 30.08</span> Диференціюємось соціальним шаром, але його замало. <b>31.08 запропоновано другий елемент — привид як фізичний об'єкт.</b> Чекає затвердження</td></tr>
+              <tr><td class="num">2</td><td>Юрособа для Google Play</td><td>Порахувати вартість у задачі 0.3. Економить 2 тижні на стор-фазі</td></tr>
+              <tr><td class="num">3</td><td>Хостинг бекенду</td><td>Cloudflare Workers — R2 у тій самій екосистемі, egress безкоштовний</td></tr>
+              <tr><td class="num">4</td><td>Репозиторій</td><td><span class="m m-ok">Вирішено 30.08</span> Лишається Zhmenya92/Game. Новий не створюємо</td></tr>
+              <tr><td class="num">5</td><td>Формат кліпу</td><td>Не вирішувати зараз — за результатом spike 0.2</td></tr>
+              <tr><td class="num">6</td><td>PlayDeck як додатковий канал дистрибуції</td><td><span class="m m-emp">Нове</span> Оцінити після гейта 3</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 11 -->
+      <section id="dzherela">
+        <div class="sec-head"><span class="n">11</span><h2>Файли і джерела</h2></div>
+
+        <h3>Документи проєкту</h3>
+        <div class="files">
+          <div class="file"><span class="fn">game-research.md</span><span class="fd">Вихідне дослідження, 23.08.2026</span></div>
+          <div class="file"><span class="fn">research-short.md</span><span class="fd">Те саме людською мовою</span></div>
+          <div class="file"><span class="fn">plan.md</span><span class="fd">Верифікація + повний план реалізації, гейти, бюджет, ризики</span></div>
+          <div class="file"><span class="fn">competitors-and-differentiation.md</span><span class="fd">Розвідка конкурентів і вибір диференціації, 31.08.2026</span></div>
+          <div class="file"><span class="fn">dashboard.html</span><span class="fd">Ця сторінка — зведення всіх чотирьох</span></div>
+        </div>
+
+        <h3>Ключові джерела</h3>
+        <div class="srcs">
+          <a href="https://play.google.com/pc-store/games/details?id=com.mindy.grap1&hl=en">Stickman Hook — Google Play</a><br>
+          <a href="https://apps.apple.com/us/app/stickman-hook/id1435807944">Stickman Hook — App Store</a><br>
+          <a href="https://apkpure.com/stickman-hook/com.mindy.grap1">Stickman Hook — чейнджлог APKPure</a><br>
+          <a href="https://apps.appfollow.io/ios/stickman-hook-racing-games/1435807944">Stickman Hook — AppFollow</a><br>
+          <a href="https://poki.com/en/g/stickman-hook">Stickman Hook — Poki</a><br>
+          <a href="https://apps.apple.com/us/app/stickman-hook-2/id1491714120">Stickman Hook 2 — App Store</a><br>
+          <a href="https://www.bluestacks.com/apps/racing/swing-loops-on-pc.html">Swing Loops — SayGames</a><br>
+          <a href="https://www.asmallgame.com/blog/2016/6/20/players-levels-in-hanger-world-part-1">Hanger World — рівні гравців</a><br>
+          <a href="https://apkpure.com/endless-hook-rope-swing-game/com.GaConDev.Hook">Endless Hook — APKPure</a><br>
+          <a href="https://telegram.org/blog/games">Telegram Gaming Platform 1.0</a><br>
+          <a href="https://core.telegram.org/api/bots/games">HTML5 games — core.telegram.org</a><br>
+          <a href="https://core.telegram.org/bots/webapps">Telegram Mini Apps — документація</a><br>
+          <a href="https://core.telegram.org/bots/payments-stars">Bot Payments API — Stars</a><br>
+          <a href="https://core.telegram.org/bots/api-changelog">Bot API changelog</a><br>
+          <a href="https://www.gamee.com/">GAMEE</a><br>
+          <a href="https://wnhub.io/news/game-design/item-49435">PlayDeck про соціальні механіки</a><br>
+          <a href="https://www.playdeck.io/">PlayDeck</a><br>
+          <a href="https://www.findmini.app/category/arcade_and_action/">findmini — аркади в Telegram</a><br>
+          <a href="https://www.aakashg.com/wordle/">Wordle is the Anti-Growth Hack</a><br>
+          <a href="https://slate.com/culture/2022/01/wordle-game-creator-wardle-twitter-scores-strategy-stats.html">Josh Wardle про походження сітки</a><br>
+          <a href="https://news.ycombinator.com/item?id=45490844">Ghost Pro Racing 3D — Show HN</a><br>
+          <a href="https://www.pocketgamer.com/real-racing-3/real-racing-3s-asynchronous-multiplayer-turns-ghosts-into-ai-competitors/">Real Racing 3 — привиди як AI</a><br>
+          <a href="https://en.wikipedia.org/wiki/Super_Time_Force">Super Time Force</a><br>
+          <a href="https://braid.fandom.com/wiki/Braid">Braid — тінь часової лінії</a><br>
+          <a href="https://www.macrumors.com/2026/06/09/app-store-guidelines-low-quality-apps/">Apple 4.3, посилення 06.2026</a><br>
+          <a href="https://www.pocketgamer.biz/what-happened-to-hypercasual-the-markets-evolution-over-the-past-year/">Що сталося з hypercasual — PocketGamer</a><br>
+          <a href="https://github.com/phaserjs/phaser/releases">Phaser — релізи</a><br>
+          <a href="https://www.cloudflare.com/products/r2/">Cloudflare R2</a>
+        </div>
+      </section>
+
+      <footer>
+        <span>Штаб проєкту Гак · оновлено 31.08.2026</span>
+        <span>Кожне число має статус. Без статусу — не підстава для рішення.</span>
+      </footer>
+
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---- theme toggle ---- */
+  var root = document.documentElement;
+  var btn = document.getElementById("themebtn");
+  function store(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+  function load(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+
+  var saved = load("hook.theme");
+  if (saved === "dark" || saved === "light") root.setAttribute("data-theme", saved);
+
+  btn.addEventListener("click", function(){
+    var cur = root.getAttribute("data-theme");
+    var isDark;
+    if (cur) { isDark = cur === "dark"; }
+    else { isDark = window.matchMedia("(prefers-color-scheme: dark)").matches; }
+    var next = isDark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    store("hook.theme", next);
+    drawRope();
+  });
+
+  /* ---- scroll spy ---- */
+  var links = Array.prototype.slice.call(document.querySelectorAll("#nav a"));
+  var targets = links.map(function(a){ return document.getElementById(a.getAttribute("href").slice(1)); });
+
+  function spy(){
+    var best = 0, bestTop = -Infinity;
+    for (var i = 0; i < targets.length; i++){
+      if (!targets[i]) continue;
+      var top = targets[i].getBoundingClientRect().top - 90;
+      if (top <= 0 && top > bestTop){ bestTop = top; best = i; }
+    }
+    for (var j = 0; j < links.length; j++){
+      links[j].classList.toggle("on", j === best);
+    }
+  }
+  var ticking = false;
+  window.addEventListener("scroll", function(){
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(function(){ spy(); ticking = false; });
+  }, {passive:true});
+  spy();
+
+  /* ---- gate checklists ---- */
+  function refresh(gate){
+    var wrap = document.querySelector('[data-gate="' + gate + '"]');
+    var counter = document.querySelector('[data-count="' + gate + '"]');
+    if (!wrap || !counter) return;
+    var boxes = wrap.querySelectorAll("input[type=checkbox]");
+    var done = 0;
+    for (var i = 0; i < boxes.length; i++){
+      boxes[i].closest(".check").classList.toggle("done", boxes[i].checked);
+      if (boxes[i].checked) done++;
+    }
+    counter.textContent = done + " / " + boxes.length;
+  }
+
+  var allBoxes = document.querySelectorAll(".checks input[type=checkbox]");
+  Array.prototype.forEach.call(allBoxes, function(box){
+    var key = "hook.gate." + box.getAttribute("data-k");
+    if (load(key) === "1") box.checked = true;
+    box.addEventListener("change", function(){
+      store(key, box.checked ? "1" : "0");
+      refresh(box.closest(".checks").getAttribute("data-gate"));
+    });
+  });
+  refresh("g1"); refresh("g2");
+
+  /* ---- masthead rope: deterministic fixed-step pendulum, seeded, no Math.random ---- */
+  var canvas = document.getElementById("rope");
+  var ctx = canvas.getContext("2d");
+
+  function prng(seed){
+    var s = seed >>> 0;
+    return function(){
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5;  s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+
+  function simulate(w, h){
+    var rand = prng(20260831);
+    var DT = 1/120, GRAV = 1600, dpr = 1;
+    var anchors = [];
+    var n = Math.max(4, Math.round(w / 190));
+    for (var i = 0; i < n; i++){
+      anchors.push({
+        x: (w / (n - 1)) * i,
+        y: h * (0.16 + rand() * 0.20)
+      });
+    }
+    var pts = [];
+    var ai = 0;
+    var a = anchors[0];
+    var ang = -0.95, vel = 1.75, len = h * 0.46;
+    var steps = Math.round(w * 3.2);
+    for (var s = 0; s < steps; s++){
+      vel += (-GRAV / len) * Math.sin(ang) * DT * 0.55;
+      ang += vel * DT;
+      var px = a.x + Math.sin(ang) * len;
+      var py = a.y + Math.cos(ang) * len;
+      pts.push([px, py]);
+      if (ang > 0.85 && ai < anchors.length - 1){
+        ai++;
+        var na = anchors[ai];
+        a = na;
+        len = h * (0.38 + (ai % 3) * 0.05);
+        ang = -0.95; vel = 1.75;
+      }
+      if (px > w + 40) break;
+    }
+    return {anchors: anchors, pts: pts};
+  }
+
+  function drawRope(){
+    var host = canvas.parentElement;
+    var w = host.clientWidth, h = host.clientHeight;
+    if (!w || !h) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    var cs = getComputedStyle(document.body);
+    var accent = cs.getPropertyValue("--accent").trim() || "#0f5c52";
+    var line = cs.getPropertyValue("--line").trim() || "#cdd6d3";
+
+    var sim = simulate(w, h);
+
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 5]);
+    ctx.beginPath();
+    for (var i = 0; i < sim.pts.length; i++){
+      if (i === 0) ctx.moveTo(sim.pts[i][0], sim.pts[i][1]);
+      else ctx.lineTo(sim.pts[i][0], sim.pts[i][1]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.globalAlpha = 0.34;
+    ctx.fillStyle = accent;
+    for (var k = 0; k < sim.anchors.length; k++){
+      ctx.beginPath();
+      ctx.arc(sim.anchors[k].x, sim.anchors[k].y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawRope();
+  var rt;
+  window.addEventListener("resize", function(){
+    clearTimeout(rt);
+    rt = setTimeout(drawRope, 140);
+  });
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", drawRope);
+})();
+</script>
